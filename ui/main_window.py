@@ -89,6 +89,7 @@ class MainWindow(QMainWindow):
         self._current_repo_type: str = "model"
         self._workers: set = set()
         self._readme_cache: dict[tuple, str] = {}
+        self._busy: bool = False
 
         self._build_ui()
         self._connect_signals()
@@ -105,17 +106,22 @@ class MainWindow(QMainWindow):
         on_success=None,
         on_error=None,
         status_msg: str | None = None,
+        busy: bool = True,
     ):
         """Run *fn* in a background thread, delivering results on the main thread."""
         worker = ApiWorker(fn, *args, **(kwargs or {}))
 
         def _on_finished(result):
             self._workers.discard(worker)
+            if busy:
+                self._set_busy(False)
             if on_success:
                 on_success(result)
 
         def _on_error(msg):
             self._workers.discard(worker)
+            if busy:
+                self._set_busy(False)
             self._status.clearMessage()
             self._progress.hide()
             if on_error:
@@ -127,11 +133,31 @@ class MainWindow(QMainWindow):
         worker.error.connect(_on_error, Qt.QueuedConnection)
         self._workers.add(worker)
 
+        if busy:
+            self._set_busy(True)
+
         if status_msg:
             self._status.showMessage(status_msg)
 
         worker.start()
         return worker
+
+    def _set_busy(self, busy: bool) -> None:
+        self._busy = busy
+        enabled = not busy
+        self._btn_login.setEnabled(enabled and self._user is None)
+        self._btn_logout.setEnabled(enabled and self._user is not None)
+        self._btn_refresh_repos.setEnabled(enabled)
+        self._btn_create_repo.setEnabled(enabled)
+        self._btn_delete_repo.setEnabled(enabled)
+        self._btn_toggle_vis.setEnabled(enabled)
+        self._repo_type_combo.setEnabled(enabled)
+        self._search_input.setEnabled(enabled)
+        self._btn_load_readme.setEnabled(enabled)
+        self._btn_edit_readme.setEnabled(enabled)
+        self._btn_new_model_card.setEnabled(enabled)
+        self._browser.set_actions_enabled(enabled)
+        self._collections.set_actions_enabled(enabled)
 
     # ── UI construction ────────────────────────────────────────────
 
@@ -345,6 +371,7 @@ class MainWindow(QMainWindow):
                 login, args=(token,),
                 on_success=lambda user: self._on_login_success(user, token),
                 on_error=lambda _msg: None,
+                busy=False,
             )
 
     def _on_login(self) -> None:
@@ -419,10 +446,11 @@ class MainWindow(QMainWindow):
             kwargs={"repo_type": repo_type, "author": self._user.username, "search": search},
             on_success=on_success,
             status_msg=f"Loading {repo_type}s...",
+            busy=False,
         )
 
     def _on_repo_selected(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
-        if current is None:
+        if current is None or self._busy:
             return
 
         info: RepoInfo = current.data(0, Qt.UserRole)
@@ -587,7 +615,7 @@ class MainWindow(QMainWindow):
             self._browser.set_files(files)
             self._status.showMessage(f"Loaded {len(files)} files.", 3000)
 
-        self._run_api(fetch, on_success=on_success, status_msg="Loading files...")
+        self._run_api(fetch, on_success=on_success, status_msg="Loading files...", busy=False)
 
     def _on_branch_changed(self, branch: str) -> None:
         self._refresh_files()
@@ -823,6 +851,7 @@ class MainWindow(QMainWindow):
             on_success=on_success,
             on_error=on_error,
             status_msg="Loading README...",
+            busy=False,
         )
 
     def _on_edit_readme(self) -> None:
@@ -909,6 +938,7 @@ class MainWindow(QMainWindow):
             list_my_collections, args=(username,),
             on_success=on_success,
             status_msg="Loading collections...",
+            busy=False,
         )
 
     def _on_create_collection(self) -> None:

@@ -60,6 +60,12 @@ class CollectionManager(QWidget):
         self._btn_refresh.clicked.connect(self.request_refresh.emit)
         self._btn_create.clicked.connect(self.request_create.emit)
         self._tree.customContextMenuRequested.connect(self._on_context_menu)
+        self._actions_enabled = True
+
+    def set_actions_enabled(self, enabled: bool) -> None:
+        self._actions_enabled = enabled
+        self._btn_refresh.setEnabled(enabled)
+        self._btn_create.setEnabled(enabled)
 
     def set_collections(self, collections: list[CollectionInfo]) -> None:
         self._tree.clear()
@@ -94,6 +100,8 @@ class CollectionManager(QWidget):
         self._tree.expandAll()
 
     def _on_context_menu(self, pos) -> None:
+        if not self._actions_enabled:
+            return
         item = self._tree.itemAt(pos)
         if not item:
             return

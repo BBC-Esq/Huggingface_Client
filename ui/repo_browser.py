@@ -87,6 +87,13 @@ class RepoBrowser(QWidget):
         self._tree.customContextMenuRequested.connect(self._on_context_menu)
         self._tree.itemDoubleClicked.connect(self._on_double_click)
         self._branch_combo.currentTextChanged.connect(self._on_branch_changed)
+        self._actions_enabled = True
+
+    def set_actions_enabled(self, enabled: bool) -> None:
+        self._actions_enabled = enabled
+        self._btn_refresh.setEnabled(enabled)
+        self._btn_upload.setEnabled(enabled)
+        self._branch_combo.setEnabled(enabled)
 
     def _on_branch_changed(self, text: str) -> None:
         if text:
@@ -177,6 +184,8 @@ class RepoBrowser(QWidget):
         return names
 
     def _on_context_menu(self, pos) -> None:
+        if not self._actions_enabled:
+            return
         selected = self._selected_file_names()
         if not selected:
             return
@@ -203,6 +212,8 @@ class RepoBrowser(QWidget):
         menu.exec(self._tree.viewport().mapToGlobal(pos))
 
     def _on_double_click(self, item: QTreeWidgetItem, column: int) -> None:
+        if not self._actions_enabled:
+            return
         rfilename = item.data(0, Qt.UserRole)
         if rfilename and self._looks_like_text(rfilename):
             self.request_edit_file.emit(rfilename)

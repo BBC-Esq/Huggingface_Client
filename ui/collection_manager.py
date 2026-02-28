@@ -1,4 +1,3 @@
-# ui/collection_manager.py
 from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -23,10 +22,10 @@ class CollectionManager(QWidget):
 
     request_refresh = Signal()
     request_create = Signal()
-    request_add_item = Signal(str)    # emits collection slug
-    request_remove_item = Signal(str, str)  # slug, item_id
-    request_delete = Signal(str)      # emits collection slug
-    request_open_url = Signal(str)    # emits url
+    request_add_item = Signal(str)
+    request_remove_item = Signal(str, str)
+    request_delete = Signal(str)
+    request_open_url = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -35,7 +34,6 @@ class CollectionManager(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
-        # Toolbar
         toolbar = QHBoxLayout()
         self._btn_refresh = QPushButton("⟳ Refresh")
         self._btn_create = QPushButton("+ New Collection")
@@ -46,7 +44,6 @@ class CollectionManager(QWidget):
         toolbar.addWidget(self._info_label)
         layout.addLayout(toolbar)
 
-        # Tree
         self._tree = QTreeWidget()
         self._tree.setHeaderLabels(["Name / Item", "Type", "Note / Description"])
         self._tree.setRootIsDecorated(True)

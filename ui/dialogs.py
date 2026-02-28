@@ -1,4 +1,3 @@
-# ui/dialogs.py
 from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -88,7 +87,6 @@ class CreateRepoDialog(QDialog):
 
         form = QFormLayout()
 
-        # Namespace (user or org)
         self._namespace_combo = QComboBox()
         if username:
             self._namespace_combo.addItem(username, username)
@@ -96,25 +94,21 @@ class CreateRepoDialog(QDialog):
             self._namespace_combo.addItem(f"{org} (org)", org)
         form.addRow("Owner:", self._namespace_combo)
 
-        # Repo name
         self._name_input = QLineEdit()
         self._name_input.setPlaceholderText("my-awesome-model")
         form.addRow("Name:", self._name_input)
 
-        # Repo type
         self._type_combo = QComboBox()
         self._type_combo.addItem("Model", "model")
         self._type_combo.addItem("Dataset", "dataset")
         self._type_combo.addItem("Space", "space")
         form.addRow("Type:", self._type_combo)
 
-        # Visibility
         self._private_check = QCheckBox("Private repository")
         form.addRow("Visibility:", self._private_check)
 
         layout.addLayout(form)
 
-        # Preview
         self._preview = QLabel("")
         self._preview.setStyleSheet("QLabel { color: #888; padding: 5px; }")
         layout.addWidget(self._preview)
@@ -161,7 +155,6 @@ class UploadDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # Upload mode
         mode_layout = QHBoxLayout()
         self._mode_files = QPushButton("Select Files")
         self._mode_folder = QPushButton("Select Folder")
@@ -169,7 +162,6 @@ class UploadDialog(QDialog):
         mode_layout.addWidget(self._mode_folder)
         layout.addLayout(mode_layout)
 
-        # Selected items display
         self._file_list = QListWidget()
         self._file_list.setMinimumHeight(120)
         layout.addWidget(self._file_list)
@@ -178,7 +170,6 @@ class UploadDialog(QDialog):
         self._is_folder: bool = False
         self._folder_path: str = ""
 
-        # Path in repo
         form = QFormLayout()
         self._path_in_repo = QLineEdit()
         self._path_in_repo.setPlaceholderText("(root of repo — or enter a subdirectory, e.g. 'models/')")
@@ -254,7 +245,6 @@ class ModelCardDialog(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # --- Metadata section ---
         meta_group = QGroupBox("Metadata (YAML frontmatter)")
         meta_form = QFormLayout()
         meta_group.setLayout(meta_form)
@@ -301,7 +291,6 @@ class ModelCardDialog(QDialog):
 
         layout.addWidget(meta_group)
 
-        # --- Content sections ---
         content_group = QGroupBox("Card Content (Markdown)")
         content_layout = QVBoxLayout()
         content_group.setLayout(content_layout)
@@ -338,7 +327,6 @@ class ModelCardDialog(QDialog):
 
         layout.addWidget(content_group)
 
-        # --- Raw editor fallback ---
         raw_group = QGroupBox("Raw README.md (advanced — edit directly)")
         raw_layout = QVBoxLayout()
         raw_group.setLayout(raw_layout)
@@ -353,7 +341,6 @@ class ModelCardDialog(QDialog):
 
         layout.addWidget(raw_group, 2)
 
-        # Buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)

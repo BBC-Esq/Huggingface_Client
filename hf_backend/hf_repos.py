@@ -1,4 +1,3 @@
-# hf_backend/hf_repos.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -16,7 +15,7 @@ class HFRepoError(RuntimeError):
 @dataclass
 class RepoInfo:
     repo_id: str
-    repo_type: str  # "model", "dataset", "space"
+    repo_type: str
     private: bool
     sha: str
     last_modified: str

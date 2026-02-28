@@ -1,4 +1,3 @@
-# hf_backend/hf_model_card.py
 from __future__ import annotations
 from typing import Optional
 
@@ -10,7 +9,6 @@ class HFModelCardError(RuntimeError):
     pass
 
 
-# Common pipeline tags for model cards
 PIPELINE_TAGS = [
     "",
     "text-generation",
@@ -40,7 +38,6 @@ PIPELINE_TAGS = [
     "video-classification",
 ]
 
-# Common licenses
 LICENSES = [
     "",
     "apache-2.0",
@@ -67,7 +64,6 @@ LICENSES = [
     "other",
 ]
 
-# Common library names
 LIBRARY_NAMES = [
     "",
     "transformers",
@@ -99,7 +95,6 @@ LIBRARY_NAMES = [
     "other",
 ]
 
-# Common languages
 COMMON_LANGUAGES = [
     "",
     "en",

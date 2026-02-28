@@ -1,4 +1,3 @@
-# hf_backend/hf_collections.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -13,7 +12,7 @@ class HFCollectionError(RuntimeError):
 @dataclass
 class CollectionItemInfo:
     item_id: str
-    item_type: str  # model, dataset, space, paper
+    item_type: str
     note: str = ""
     position: int = 0
 

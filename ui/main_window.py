@@ -1,4 +1,3 @@
-# ui/main_window.py
 from __future__ import annotations
 import webbrowser
 from pathlib import Path
@@ -97,15 +96,12 @@ class MainWindow(QMainWindow):
         self._restore_window()
         self._try_auto_login()
 
-    # ───────────────────── UI construction ─────────────────────
-
     def _build_ui(self) -> None:
         self._root = QWidget()
         self.setCentralWidget(self._root)
         root_layout = QVBoxLayout()
         self._root.setLayout(root_layout)
 
-        # ── Auth bar ──
         auth_group = QGroupBox("Account")
         auth_layout = QHBoxLayout()
         auth_group.setLayout(auth_layout)
@@ -119,11 +115,9 @@ class MainWindow(QMainWindow):
         auth_layout.addWidget(self._btn_logout)
         root_layout.addWidget(auth_group)
 
-        # ── Main splitter ──
         self._splitter = QSplitter(Qt.Horizontal)
         root_layout.addWidget(self._splitter, 1)
 
-        # ── LEFT: Repo list ──
         left = QWidget()
         left_layout = QVBoxLayout()
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -162,13 +156,16 @@ class MainWindow(QMainWindow):
 
         header = self._repo_tree.header()
         header.setStretchLastSection(False)
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        for i in range(1, 5):
-            header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+        for i in range(5):
+            header.setSectionResizeMode(i, QHeaderView.Interactive)
+        header.resizeSection(0, 300)
+        header.resizeSection(1, 80)
+        header.resizeSection(2, 90)
+        header.resizeSection(3, 70)
+        header.resizeSection(4, 150)
 
         left_layout.addWidget(self._repo_tree, 1)
 
-        # Repo action buttons
         repo_actions = QHBoxLayout()
         self._btn_delete_repo = QPushButton("Delete Repo")
         self._btn_toggle_vis = QPushButton("Toggle Visibility")
@@ -180,7 +177,6 @@ class MainWindow(QMainWindow):
 
         self._splitter.addWidget(left)
 
-        # ── RIGHT: Tabs ──
         right = QWidget()
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -193,11 +189,9 @@ class MainWindow(QMainWindow):
         self._tabs = QTabWidget()
         right_layout.addWidget(self._tabs, 1)
 
-        # Tab 1: File browser
         self._browser = RepoBrowser()
         self._tabs.addTab(self._browser, "Files")
 
-        # Tab 2: README / Model Card
         readme_widget = QWidget()
         readme_layout = QVBoxLayout()
         readme_widget.setLayout(readme_layout)
@@ -223,15 +217,13 @@ class MainWindow(QMainWindow):
 
         self._tabs.addTab(readme_widget, "README")
 
-        # Tab 3: Collections
         self._collections = CollectionManager()
         self._tabs.addTab(self._collections, "Collections")
 
         self._splitter.addWidget(right)
         self._splitter.setStretchFactor(0, 1)
-        self._splitter.setStretchFactor(1, 2)
+        self._splitter.setStretchFactor(1, 1)
 
-        # ── Status bar ──
         self._status = QStatusBar()
         self.setStatusBar(self._status)
         self._progress = QProgressBar()
@@ -240,11 +232,9 @@ class MainWindow(QMainWindow):
         self._status.addPermanentWidget(self._progress)
 
     def _connect_signals(self) -> None:
-        # Auth
         self._btn_login.clicked.connect(self._on_login)
         self._btn_logout.clicked.connect(self._on_logout)
 
-        # Repo list
         self._btn_refresh_repos.clicked.connect(self._refresh_repos)
         self._btn_create_repo.clicked.connect(self._on_create_repo)
         self._repo_type_combo.currentIndexChanged.connect(self._refresh_repos)
@@ -254,7 +244,6 @@ class MainWindow(QMainWindow):
         self._btn_toggle_vis.clicked.connect(self._on_toggle_visibility)
         self._btn_open_hub.clicked.connect(self._on_open_hub)
 
-        # File browser
         self._browser.request_refresh.connect(self._refresh_files)
         self._browser.request_upload.connect(self._on_upload)
         self._browser.request_edit_file.connect(self._on_edit_file)
@@ -262,20 +251,16 @@ class MainWindow(QMainWindow):
         self._browser.request_download_file.connect(self._on_download_file)
         self._browser.branch_changed.connect(self._on_branch_changed)
 
-        # README
         self._btn_load_readme.clicked.connect(self._load_readme)
         self._btn_edit_readme.clicked.connect(self._on_edit_readme)
         self._btn_new_model_card.clicked.connect(self._on_new_model_card)
 
-        # Collections
         self._collections.request_refresh.connect(self._refresh_collections)
         self._collections.request_create.connect(self._on_create_collection)
         self._collections.request_add_item.connect(self._on_add_to_collection)
         self._collections.request_remove_item.connect(self._on_remove_from_collection)
         self._collections.request_delete.connect(self._on_delete_collection)
         self._collections.request_open_url.connect(lambda url: webbrowser.open(url))
-
-    # ───────────────────── Window state ─────────────────────
 
     def _restore_window(self) -> None:
         geometry = self._settings.get_window_geometry()
@@ -292,8 +277,9 @@ class MainWindow(QMainWindow):
 
         if splitter_state is not None:
             self._splitter.restoreState(splitter_state)
+        else:
+            self._splitter.setSizes([650, 650])
 
-        # Restore repo type
         saved_type = self._settings.get_last_repo_type()
         if saved_type:
             idx = self._repo_type_combo.findData(saved_type)
@@ -305,8 +291,6 @@ class MainWindow(QMainWindow):
         self._settings.set_window_state(self.saveState())
         self._settings.set_splitter_state(self._splitter.saveState())
         super().closeEvent(event)
-
-    # ───────────────────── Auth ─────────────────────
 
     def _try_auto_login(self) -> None:
         token = self._settings.get_hf_token()
@@ -365,8 +349,6 @@ class MainWindow(QMainWindow):
         self._current_repo_id = ""
         self._repo_info_label.setText("Select a repository from the list")
         self._status.showMessage("Logged out.", 3000)
-
-    # ───────────────────── Repo list ─────────────────────
 
     def _refresh_repos(self) -> None:
         if not self._user:
@@ -473,7 +455,6 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        # Double-confirm
         reply2 = QMessageBox.warning(
             self,
             "Confirm Deletion",
@@ -541,8 +522,6 @@ class MainWindow(QMainWindow):
         url = f"https://huggingface.co/{type_prefix}{self._current_repo_id}"
         webbrowser.open(url)
 
-    # ───────────────────── File browser ─────────────────────
-
     def _refresh_files(self) -> None:
         if not self._current_repo_id:
             return
@@ -551,7 +530,6 @@ class MainWindow(QMainWindow):
         self._status.showMessage("Loading files...")
         QApplication.processEvents()
 
-        # Load branches
         try:
             refs = list_repo_refs(self._current_repo_id, self._current_repo_type)
             branches = refs.get("branches", ["main"])
@@ -559,7 +537,6 @@ class MainWindow(QMainWindow):
         except HFRepoError:
             self._browser.set_branches(["main"], "main")
 
-        # Load files
         try:
             files = list_repo_files(self._current_repo_id, self._current_repo_type, revision=branch)
             self._browser.set_files(files)
@@ -754,8 +731,6 @@ class MainWindow(QMainWindow):
         self._progress.hide()
         self._status.showMessage(f"Downloaded to: {local_path}", 5000)
 
-    # ───────────────────── README / Model Card ─────────────────────
-
     def _load_readme(self) -> None:
         if not self._current_repo_id:
             self._readme_view.clear()
@@ -845,8 +820,6 @@ class MainWindow(QMainWindow):
         self._load_readme()
         self._refresh_files()
 
-    # ───────────────────── Collections ─────────────────────
-
     def _refresh_collections(self) -> None:
         if not self._user:
             return
@@ -895,7 +868,6 @@ class MainWindow(QMainWindow):
     def _on_add_to_collection(self, slug: str) -> None:
         dlg = AddToCollectionDialog(parent=self)
 
-        # Pre-fill with current repo if one is selected
         if self._current_repo_id:
             dlg._item_id.setText(self._current_repo_id)
             idx = dlg._item_type.findData(self._current_repo_type)

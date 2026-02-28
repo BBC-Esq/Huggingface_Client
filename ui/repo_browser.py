@@ -1,4 +1,3 @@
-# ui/repo_browser.py
 from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QFont, QColor
@@ -33,13 +32,13 @@ def _human_size(size: int) -> str:
 class RepoBrowser(QWidget):
     """Displays files in a HF repo as a flat tree with folder grouping."""
 
-    file_selected = Signal(str)          # emits rfilename
-    request_edit_file = Signal(str)      # emits rfilename for text editing
-    request_delete_files = Signal(list)  # emits list of rfilenames
-    request_download_file = Signal(str)  # emits rfilename
+    file_selected = Signal(str)
+    request_edit_file = Signal(str)
+    request_delete_files = Signal(list)
+    request_download_file = Signal(str)
     request_upload = Signal()
     request_refresh = Signal()
-    branch_changed = Signal(str)         # emits new branch name
+    branch_changed = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -48,7 +47,6 @@ class RepoBrowser(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(layout)
 
-        # Toolbar
         toolbar = QHBoxLayout()
 
         self._branch_combo = QComboBox()
@@ -68,7 +66,6 @@ class RepoBrowser(QWidget):
 
         layout.addLayout(toolbar)
 
-        # File tree
         self._tree = QTreeWidget()
         self._tree.setHeaderLabels(["Name", "Size", "LFS", "Blob ID"])
         self._tree.setRootIsDecorated(True)
@@ -85,7 +82,6 @@ class RepoBrowser(QWidget):
 
         layout.addWidget(self._tree, 1)
 
-        # Connect signals
         self._btn_refresh.clicked.connect(self.request_refresh.emit)
         self._btn_upload.clicked.connect(self.request_upload.emit)
         self._tree.customContextMenuRequested.connect(self._on_context_menu)
@@ -113,7 +109,6 @@ class RepoBrowser(QWidget):
         """Populate the tree from a flat list of file entries."""
         self._tree.clear()
 
-        # Group files by directory
         folder_items: dict[str, QTreeWidgetItem] = {}
         total_size = 0
 
@@ -122,7 +117,6 @@ class RepoBrowser(QWidget):
             parts = entry.rfilename.split("/")
 
             if len(parts) == 1:
-                # Root-level file
                 item = QTreeWidgetItem([
                     entry.rfilename,
                     _human_size(entry.size),
@@ -132,7 +126,6 @@ class RepoBrowser(QWidget):
                 item.setData(0, Qt.UserRole, entry.rfilename)
                 self._tree.addTopLevelItem(item)
             else:
-                # File in subdirectory
                 folder_path = "/".join(parts[:-1])
                 parent = self._get_or_create_folder(folder_items, folder_path)
                 item = QTreeWidgetItem([
@@ -156,7 +149,7 @@ class RepoBrowser(QWidget):
         parts = folder_path.split("/")
         if len(parts) == 1:
             item = QTreeWidgetItem([folder_path, "", "", ""])
-            item.setData(0, Qt.UserRole, None)  # Folders have no rfilename
+            item.setData(0, Qt.UserRole, None)
             font = item.font(0)
             font.setBold(True)
             item.setFont(0, font)

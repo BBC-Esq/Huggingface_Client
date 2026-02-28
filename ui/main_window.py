@@ -2,7 +2,7 @@ from __future__ import annotations
 import webbrowser
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QTreeWidget,
     QTreeWidgetItem,
     QHeaderView,
-    QApplication,
     QFileDialog,
     QDialog,
     QStatusBar,
@@ -29,6 +28,7 @@ from PySide6.QtWidgets import (
 from settings import AppSettings
 from ui.repo_browser import RepoBrowser
 from ui.collection_manager import CollectionManager
+from ui.workers import ApiWorker
 from ui.dialogs import (
     LoginDialog,
     CreateRepoDialog,
@@ -39,7 +39,7 @@ from ui.dialogs import (
     TextEditorDialog,
 )
 
-from hf_backend.hf_auth import login, whoami, get_cached_token, HFAuthError, UserInfo
+from hf_backend.hf_auth import login, get_cached_token, UserInfo
 from hf_backend.hf_repos import (
     list_my_repos,
     create_repo,
@@ -47,7 +47,6 @@ from hf_backend.hf_repos import (
     update_repo_visibility,
     list_repo_files,
     list_repo_refs,
-    get_repo_info,
     HFRepoError,
     RepoInfo,
 )
@@ -58,7 +57,6 @@ from hf_backend.hf_files import (
     delete_files,
     get_file_content,
     upload_file_content,
-    HFFileError,
 )
 from hf_backend.hf_collections import (
     list_my_collections,
@@ -66,9 +64,8 @@ from hf_backend.hf_collections import (
     delete_collection as hf_delete_collection,
     add_collection_item,
     remove_collection_item,
-    HFCollectionError,
 )
-from hf_backend.hf_model_card import get_readme, push_readme, HFModelCardError
+from hf_backend.hf_model_card import get_readme, push_readme
 
 
 def _human_size(size: int) -> str:
@@ -90,11 +87,52 @@ class MainWindow(QMainWindow):
         self._user: UserInfo | None = None
         self._current_repo_id: str = ""
         self._current_repo_type: str = "model"
+        self._workers: set = set()
 
         self._build_ui()
         self._connect_signals()
         self._restore_window()
         self._try_auto_login()
+
+    # ── worker helper ──────────────────────────────────────────────
+
+    def _run_api(
+        self,
+        fn,
+        args: tuple = (),
+        kwargs: dict | None = None,
+        on_success=None,
+        on_error=None,
+        status_msg: str | None = None,
+    ):
+        """Run *fn* in a background thread, delivering results on the main thread."""
+        worker = ApiWorker(fn, *args, **(kwargs or {}))
+
+        def _on_finished(result):
+            self._workers.discard(worker)
+            if on_success:
+                on_success(result)
+
+        def _on_error(msg):
+            self._workers.discard(worker)
+            self._status.clearMessage()
+            self._progress.hide()
+            if on_error:
+                on_error(msg)
+            else:
+                QMessageBox.critical(self, "Error", msg)
+
+        worker.finished.connect(_on_finished, Qt.QueuedConnection)
+        worker.error.connect(_on_error, Qt.QueuedConnection)
+        self._workers.add(worker)
+
+        if status_msg:
+            self._status.showMessage(status_msg)
+
+        worker.start()
+        return worker
+
+    # ── UI construction ────────────────────────────────────────────
 
     def _build_ui(self) -> None:
         self._root = QWidget()
@@ -287,21 +325,26 @@ class MainWindow(QMainWindow):
                 self._repo_type_combo.setCurrentIndex(idx)
 
     def closeEvent(self, event) -> None:
+        for worker in list(self._workers):
+            worker.blockSignals(True)
+            worker.cancel()
         self._settings.set_window_geometry(self.saveGeometry())
         self._settings.set_window_state(self.saveState())
         self._settings.set_splitter_state(self._splitter.saveState())
         super().closeEvent(event)
+
+    # ── authentication ─────────────────────────────────────────────
 
     def _try_auto_login(self) -> None:
         token = self._settings.get_hf_token()
         if not token:
             token = get_cached_token()
         if token:
-            try:
-                user = login(token)
-                self._on_login_success(user, token)
-            except HFAuthError:
-                pass
+            self._run_api(
+                login, args=(token,),
+                on_success=lambda user: self._on_login_success(user, token),
+                on_error=lambda _msg: None,
+            )
 
     def _on_login(self) -> None:
         token = self._settings.get_hf_token() or get_cached_token()
@@ -310,17 +353,12 @@ class MainWindow(QMainWindow):
             return
 
         token = dlg.get_token()
-        self._status.showMessage("Logging in...")
-        QApplication.processEvents()
-
-        try:
-            user = login(token)
-        except HFAuthError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Login failed", str(e))
-            return
-
-        self._on_login_success(user, token)
+        self._run_api(
+            login, args=(token,),
+            on_success=lambda user: self._on_login_success(user, token),
+            on_error=lambda msg: QMessageBox.critical(self, "Login failed", msg),
+            status_msg="Logging in...",
+        )
 
     def _on_login_success(self, user: UserInfo, token: str) -> None:
         self._user = user
@@ -350,6 +388,8 @@ class MainWindow(QMainWindow):
         self._repo_info_label.setText("Select a repository from the list")
         self._status.showMessage("Logged out.", 3000)
 
+    # ── repository list ────────────────────────────────────────────
+
     def _refresh_repos(self) -> None:
         if not self._user:
             return
@@ -358,33 +398,26 @@ class MainWindow(QMainWindow):
         self._settings.set_last_repo_type(repo_type)
         search = self._search_input.text().strip() or None
 
-        self._status.showMessage(f"Loading {repo_type}s...")
-        QApplication.processEvents()
+        def on_success(repos):
+            self._repo_tree.clear()
+            for r in repos:
+                item = QTreeWidgetItem([
+                    r.repo_id,
+                    "Private" if r.private else "Public",
+                    str(r.downloads),
+                    str(r.likes),
+                    r.last_modified[:19] if r.last_modified else "",
+                ])
+                item.setData(0, Qt.UserRole, r)
+                self._repo_tree.addTopLevelItem(item)
+            self._status.showMessage(f"Found {len(repos)} {repo_type}(s).", 3000)
 
-        try:
-            repos = list_my_repos(
-                repo_type=repo_type,
-                author=self._user.username,
-                search=search,
-            )
-        except HFRepoError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Error", str(e))
-            return
-
-        self._repo_tree.clear()
-        for r in repos:
-            item = QTreeWidgetItem([
-                r.repo_id,
-                "Private" if r.private else "Public",
-                str(r.downloads),
-                str(r.likes),
-                r.last_modified[:19] if r.last_modified else "",
-            ])
-            item.setData(0, Qt.UserRole, r)
-            self._repo_tree.addTopLevelItem(item)
-
-        self._status.showMessage(f"Found {len(repos)} {repo_type}(s).", 3000)
+        self._run_api(
+            list_my_repos,
+            kwargs={"repo_type": repo_type, "author": self._user.username, "search": search},
+            on_success=on_success,
+            status_msg=f"Loading {repo_type}s...",
+        )
 
     def _on_repo_selected(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
         if current is None:
@@ -422,23 +455,19 @@ class MainWindow(QMainWindow):
             return
 
         details = dlg.get_details()
-        self._status.showMessage("Creating repository...")
-        QApplication.processEvents()
 
-        try:
-            url = create_repo(
-                repo_id=details["repo_id"],
-                repo_type=details["repo_type"],
-                private=details["private"],
-            )
-        except HFRepoError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Create failed", str(e))
-            return
+        def on_success(url):
+            self._status.showMessage(f"Created: {url}", 5000)
+            QMessageBox.information(self, "Repository created", f"Created successfully:\n{url}")
+            self._refresh_repos()
 
-        self._status.showMessage(f"Created: {url}", 5000)
-        QMessageBox.information(self, "Repository created", f"Created successfully:\n{url}")
-        self._refresh_repos()
+        self._run_api(
+            create_repo,
+            kwargs={"repo_id": details["repo_id"], "repo_type": details["repo_type"], "private": details["private"]},
+            on_success=on_success,
+            on_error=lambda msg: QMessageBox.critical(self, "Create failed", msg),
+            status_msg="Creating repository...",
+        )
 
     def _on_delete_repo(self) -> None:
         if not self._current_repo_id:
@@ -465,18 +494,22 @@ class MainWindow(QMainWindow):
         if reply2 != QMessageBox.Yes:
             return
 
-        try:
-            delete_repo(self._current_repo_id, self._current_repo_type)
-        except HFRepoError as e:
-            QMessageBox.critical(self, "Delete failed", str(e))
-            return
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        self._status.showMessage(f"Deleted: {self._current_repo_id}", 5000)
-        self._current_repo_id = ""
-        self._browser.clear()
-        self._readme_view.clear()
-        self._repo_info_label.setText("Select a repository from the list")
-        self._refresh_repos()
+        def on_success(_result):
+            self._status.showMessage(f"Deleted: {repo_id}", 5000)
+            self._current_repo_id = ""
+            self._browser.clear()
+            self._readme_view.clear()
+            self._repo_info_label.setText("Select a repository from the list")
+            self._refresh_repos()
+
+        self._run_api(
+            delete_repo, args=(repo_id, repo_type),
+            on_success=on_success,
+            on_error=lambda msg: QMessageBox.critical(self, "Delete failed", msg),
+        )
 
     def _on_toggle_visibility(self) -> None:
         if not self._current_repo_id:
@@ -500,14 +533,17 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        try:
-            update_repo_visibility(self._current_repo_id, self._current_repo_type, new_private)
-        except HFRepoError as e:
-            QMessageBox.critical(self, "Error", str(e))
-            return
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        self._status.showMessage(f"Visibility updated to {action}.", 3000)
-        self._refresh_repos()
+        def on_success(_result):
+            self._status.showMessage(f"Visibility updated to {action}.", 3000)
+            self._refresh_repos()
+
+        self._run_api(
+            update_repo_visibility, args=(repo_id, repo_type, new_private),
+            on_success=on_success,
+        )
 
     def _on_open_hub(self) -> None:
         if not self._current_repo_id:
@@ -522,30 +558,34 @@ class MainWindow(QMainWindow):
         url = f"https://huggingface.co/{type_prefix}{self._current_repo_id}"
         webbrowser.open(url)
 
+    # ── file browser ───────────────────────────────────────────────
+
     def _refresh_files(self) -> None:
         if not self._current_repo_id:
             return
 
         branch = self._browser.get_current_branch() or "main"
-        self._status.showMessage("Loading files...")
-        QApplication.processEvents()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        try:
-            refs = list_repo_refs(self._current_repo_id, self._current_repo_type)
-            branches = refs.get("branches", ["main"])
+        def fetch():
+            try:
+                refs = list_repo_refs(repo_id, repo_type)
+                branches = refs.get("branches", ["main"])
+            except HFRepoError:
+                branches = ["main"]
+            files = list_repo_files(repo_id, repo_type, revision=branch)
+            return branches, files
+
+        def on_success(result):
+            if self._current_repo_id != repo_id:
+                return
+            branches, files = result
             self._browser.set_branches(branches, branch)
-        except HFRepoError:
-            self._browser.set_branches(["main"], "main")
-
-        try:
-            files = list_repo_files(self._current_repo_id, self._current_repo_type, revision=branch)
             self._browser.set_files(files)
-        except HFRepoError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Error", str(e))
-            return
+            self._status.showMessage(f"Loaded {len(files)} files.", 3000)
 
-        self._status.showMessage(f"Loaded {len(files)} files.", 3000)
+        self._run_api(fetch, on_success=on_success, status_msg="Loading files...")
 
     def _on_branch_changed(self, branch: str) -> None:
         self._refresh_files()
@@ -564,20 +604,21 @@ class MainWindow(QMainWindow):
             return
 
         details = dlg.get_details()
-        self._status.showMessage("Uploading...")
-        self._progress.setRange(0, 0)
-        self._progress.show()
-        QApplication.processEvents()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        try:
+        if details["is_folder"]:
+            self._settings.set_last_upload_dir(details["folder_path"])
+        elif details["file_paths"]:
+            self._settings.set_last_upload_dir(str(Path(details["file_paths"][0]).parent))
+
+        def do_upload():
             if details["is_folder"]:
-                folder = details["folder_path"]
-                self._settings.set_last_upload_dir(folder)
                 upload_folder(
-                    repo_id=self._current_repo_id,
-                    folder_path=folder,
+                    repo_id=repo_id,
+                    folder_path=details["folder_path"],
                     path_in_repo=details["path_in_repo"],
-                    repo_type=self._current_repo_type,
+                    repo_type=repo_type,
                     commit_message=details["commit_message"],
                     revision=details["revision"],
                 )
@@ -589,77 +630,82 @@ class MainWindow(QMainWindow):
                         target = f"{path_in_repo.rstrip('/')}/{fname}"
                     else:
                         target = fname
-
-                    self._settings.set_last_upload_dir(str(Path(fpath).parent))
                     upload_file(
-                        repo_id=self._current_repo_id,
+                        repo_id=repo_id,
                         local_path=fpath,
                         path_in_repo=target,
-                        repo_type=self._current_repo_type,
+                        repo_type=repo_type,
                         commit_message=details["commit_message"],
                         revision=details["revision"],
                     )
-        except HFFileError as e:
-            self._progress.hide()
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Upload failed", str(e))
-            self._refresh_files()
-            return
 
-        self._progress.hide()
-        self._status.showMessage("Upload complete.", 5000)
-        self._refresh_files()
+        self._progress.setRange(0, 0)
+        self._progress.show()
+
+        def on_success(_result):
+            self._progress.hide()
+            self._status.showMessage("Upload complete.", 5000)
+            self._refresh_files()
+
+        def on_error(msg):
+            self._progress.hide()
+            QMessageBox.critical(self, "Upload failed", msg)
+            self._refresh_files()
+
+        self._run_api(do_upload, on_success=on_success, on_error=on_error, status_msg="Uploading...")
 
     def _on_edit_file(self, rfilename: str) -> None:
         if not self._current_repo_id:
             return
 
         branch = self._browser.get_current_branch() or "main"
-        self._status.showMessage(f"Loading {rfilename}...")
-        QApplication.processEvents()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        try:
-            content = get_file_content(
-                self._current_repo_id, rfilename,
-                repo_type=self._current_repo_type,
-                revision=branch,
-            )
-        except HFFileError as e:
+        def on_loaded(content):
             self._status.clearMessage()
-            QMessageBox.critical(self, "Error", str(e))
-            return
+            dlg = TextEditorDialog(
+                title=f"{repo_id} - {rfilename}",
+                content=content,
+                parent=self,
+            )
+            if dlg.exec() != QDialog.Accepted:
+                return
 
-        self._status.clearMessage()
-        dlg = TextEditorDialog(
-            title=f"{self._current_repo_id} - {rfilename}",
-            content=content,
-            parent=self,
+            new_content = dlg.get_content()
+            commit_msg = dlg.get_commit_message()
+
+            def on_saved(_result):
+                self._status.showMessage(f"Saved {rfilename}.", 3000)
+                self._refresh_files()
+
+            self._run_api(
+                upload_file_content,
+                kwargs={
+                    "repo_id": repo_id,
+                    "content": new_content,
+                    "path_in_repo": rfilename,
+                    "repo_type": repo_type,
+                    "commit_message": commit_msg,
+                    "revision": branch,
+                },
+                on_success=on_saved,
+                on_error=lambda msg: QMessageBox.critical(self, "Save failed", msg),
+                status_msg=f"Saving {rfilename}...",
+            )
+
+        self._run_api(
+            get_file_content,
+            kwargs={
+                "repo_id": repo_id,
+                "path_in_repo": rfilename,
+                "repo_type": repo_type,
+                "revision": branch,
+            },
+            on_success=on_loaded,
+            on_error=lambda msg: QMessageBox.critical(self, "Error", msg),
+            status_msg=f"Loading {rfilename}...",
         )
-        if dlg.exec() != QDialog.Accepted:
-            return
-
-        new_content = dlg.get_content()
-        commit_msg = dlg.get_commit_message()
-
-        self._status.showMessage(f"Saving {rfilename}...")
-        QApplication.processEvents()
-
-        try:
-            upload_file_content(
-                repo_id=self._current_repo_id,
-                content=new_content,
-                path_in_repo=rfilename,
-                repo_type=self._current_repo_type,
-                commit_message=commit_msg,
-                revision=branch,
-            )
-        except HFFileError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Save failed", str(e))
-            return
-
-        self._status.showMessage(f"Saved {rfilename}.", 3000)
-        self._refresh_files()
 
     def _on_delete_files(self, filenames: list[str]) -> None:
         if not self._current_repo_id or not filenames:
@@ -678,25 +724,31 @@ class MainWindow(QMainWindow):
             return
 
         branch = self._browser.get_current_branch() or "main"
-        self._status.showMessage("Deleting files...")
-        QApplication.processEvents()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
+        count = len(filenames)
 
-        try:
-            delete_files(
-                repo_id=self._current_repo_id,
-                paths_in_repo=filenames,
-                repo_type=self._current_repo_type,
-                commit_message=f"Delete {len(filenames)} file(s)",
-                revision=branch,
-            )
-        except HFFileError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Delete failed", str(e))
+        def on_success(_result):
+            self._status.showMessage(f"Deleted {count} file(s).", 3000)
             self._refresh_files()
-            return
 
-        self._status.showMessage(f"Deleted {len(filenames)} file(s).", 3000)
-        self._refresh_files()
+        def on_error(msg):
+            QMessageBox.critical(self, "Delete failed", msg)
+            self._refresh_files()
+
+        self._run_api(
+            delete_files,
+            kwargs={
+                "repo_id": repo_id,
+                "paths_in_repo": filenames,
+                "repo_type": repo_type,
+                "commit_message": f"Delete {count} file(s)",
+                "revision": branch,
+            },
+            on_success=on_success,
+            on_error=on_error,
+            status_msg="Deleting files...",
+        )
 
     def _on_download_file(self, rfilename: str) -> None:
         if not self._current_repo_id:
@@ -709,43 +761,60 @@ class MainWindow(QMainWindow):
             return
 
         branch = self._browser.get_current_branch() or "main"
-        self._status.showMessage(f"Downloading {rfilename}...")
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
+
         self._progress.setRange(0, 0)
         self._progress.show()
-        QApplication.processEvents()
 
-        try:
-            local_path = download_file(
-                repo_id=self._current_repo_id,
-                filename=rfilename,
-                local_dir=dest_dir,
-                repo_type=self._current_repo_type,
-                revision=branch,
-            )
-        except HFFileError as e:
+        def on_success(local_path):
             self._progress.hide()
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Download failed", str(e))
-            return
+            self._status.showMessage(f"Downloaded to: {local_path}", 5000)
 
-        self._progress.hide()
-        self._status.showMessage(f"Downloaded to: {local_path}", 5000)
+        def on_error(msg):
+            self._progress.hide()
+            QMessageBox.critical(self, "Download failed", msg)
+
+        self._run_api(
+            download_file,
+            kwargs={
+                "repo_id": repo_id,
+                "filename": rfilename,
+                "local_dir": dest_dir,
+                "repo_type": repo_type,
+                "revision": branch,
+            },
+            on_success=on_success,
+            on_error=on_error,
+            status_msg=f"Downloading {rfilename}...",
+        )
+
+    # ── README / model card ────────────────────────────────────────
 
     def _load_readme(self) -> None:
         if not self._current_repo_id:
             self._readme_view.clear()
             return
 
-        self._status.showMessage("Loading README...")
-        QApplication.processEvents()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        try:
-            content = get_readme(self._current_repo_id, self._current_repo_type)
-        except Exception:
-            content = ""
+        def on_success(content):
+            if self._current_repo_id != repo_id:
+                return
+            self._readme_view.setPlainText(content if content else "(No README.md found)")
+            self._status.clearMessage()
 
-        self._readme_view.setPlainText(content if content else "(No README.md found)")
-        self._status.clearMessage()
+        def on_error(_msg):
+            self._readme_view.setPlainText("(No README.md found)")
+
+        self._run_api(
+            get_readme, args=(repo_id,),
+            kwargs={"repo_type": repo_type},
+            on_success=on_success,
+            on_error=on_error,
+            status_msg="Loading README...",
+        )
 
     def _on_edit_readme(self) -> None:
         if not self._current_repo_id:
@@ -765,25 +834,21 @@ class MainWindow(QMainWindow):
 
         new_content = dlg.get_content()
         commit_msg = dlg.get_commit_message()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        self._status.showMessage("Saving README...")
-        QApplication.processEvents()
+        def on_success(_result):
+            self._status.showMessage("README saved.", 3000)
+            self._load_readme()
+            self._refresh_files()
 
-        try:
-            push_readme(
-                self._current_repo_id,
-                new_content,
-                repo_type=self._current_repo_type,
-                commit_message=commit_msg,
-            )
-        except HFModelCardError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Save failed", str(e))
-            return
-
-        self._status.showMessage("README saved.", 3000)
-        self._load_readme()
-        self._refresh_files()
+        self._run_api(
+            push_readme, args=(repo_id, new_content),
+            kwargs={"repo_type": repo_type, "commit_message": commit_msg},
+            on_success=on_success,
+            on_error=lambda msg: QMessageBox.critical(self, "Save failed", msg),
+            status_msg="Saving README...",
+        )
 
     def _on_new_model_card(self) -> None:
         if not self._current_repo_id:
@@ -801,41 +866,39 @@ class MainWindow(QMainWindow):
         if not content.strip():
             return
 
-        self._status.showMessage("Pushing model card...")
-        QApplication.processEvents()
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
 
-        try:
-            push_readme(
-                self._current_repo_id,
-                content,
-                repo_type=self._current_repo_type,
-                commit_message="Add/update model card",
-            )
-        except HFModelCardError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Push failed", str(e))
-            return
+        def on_success(_result):
+            self._status.showMessage("Model card pushed.", 3000)
+            self._load_readme()
+            self._refresh_files()
 
-        self._status.showMessage("Model card pushed.", 3000)
-        self._load_readme()
-        self._refresh_files()
+        self._run_api(
+            push_readme, args=(repo_id, content),
+            kwargs={"repo_type": repo_type, "commit_message": "Add/update model card"},
+            on_success=on_success,
+            on_error=lambda msg: QMessageBox.critical(self, "Push failed", msg),
+            status_msg="Pushing model card...",
+        )
+
+    # ── collections ────────────────────────────────────────────────
 
     def _refresh_collections(self) -> None:
         if not self._user:
             return
 
-        self._status.showMessage("Loading collections...")
-        QApplication.processEvents()
+        username = self._user.username
 
-        try:
-            colls = list_my_collections(self._user.username)
-        except HFCollectionError as e:
-            self._status.clearMessage()
-            QMessageBox.critical(self, "Error", str(e))
-            return
+        def on_success(colls):
+            self._collections.set_collections(colls)
+            self._status.showMessage(f"Loaded {len(colls)} collections.", 3000)
 
-        self._collections.set_collections(colls)
-        self._status.showMessage(f"Loaded {len(colls)} collections.", 3000)
+        self._run_api(
+            list_my_collections, args=(username,),
+            on_success=on_success,
+            status_msg="Loading collections...",
+        )
 
     def _on_create_collection(self) -> None:
         if not self._user:
@@ -851,19 +914,20 @@ class MainWindow(QMainWindow):
 
         details = dlg.get_details()
 
-        try:
-            coll = hf_create_collection(
-                title=details["title"],
-                namespace=details["namespace"],
-                description=details["description"],
-                private=details["private"],
-            )
-        except HFCollectionError as e:
-            QMessageBox.critical(self, "Error", str(e))
-            return
+        def on_success(coll):
+            self._status.showMessage(f"Collection created: {coll.slug}", 5000)
+            self._refresh_collections()
 
-        self._status.showMessage(f"Collection created: {coll.slug}", 5000)
-        self._refresh_collections()
+        self._run_api(
+            hf_create_collection,
+            kwargs={
+                "title": details["title"],
+                "namespace": details["namespace"],
+                "description": details["description"],
+                "private": details["private"],
+            },
+            on_success=on_success,
+        )
 
     def _on_add_to_collection(self, slug: str) -> None:
         dlg = AddToCollectionDialog(parent=self)
@@ -879,19 +943,20 @@ class MainWindow(QMainWindow):
 
         details = dlg.get_details()
 
-        try:
-            add_collection_item(
-                slug=slug,
-                item_id=details["item_id"],
-                item_type=details["item_type"],
-                note=details["note"],
-            )
-        except HFCollectionError as e:
-            QMessageBox.critical(self, "Error", str(e))
-            return
+        def on_success(_result):
+            self._status.showMessage("Item added to collection.", 3000)
+            self._refresh_collections()
 
-        self._status.showMessage("Item added to collection.", 3000)
-        self._refresh_collections()
+        self._run_api(
+            add_collection_item,
+            kwargs={
+                "slug": slug,
+                "item_id": details["item_id"],
+                "item_type": details["item_type"],
+                "note": details["note"],
+            },
+            on_success=on_success,
+        )
 
     def _on_remove_from_collection(self, slug: str, item_id: str) -> None:
         reply = QMessageBox.question(
@@ -904,14 +969,14 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        try:
-            remove_collection_item(slug, item_id)
-        except HFCollectionError as e:
-            QMessageBox.critical(self, "Error", str(e))
-            return
+        def on_success(_result):
+            self._status.showMessage("Item removed from collection.", 3000)
+            self._refresh_collections()
 
-        self._status.showMessage("Item removed from collection.", 3000)
-        self._refresh_collections()
+        self._run_api(
+            remove_collection_item, args=(slug, item_id),
+            on_success=on_success,
+        )
 
     def _on_delete_collection(self, slug: str) -> None:
         reply = QMessageBox.warning(
@@ -924,11 +989,11 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        try:
-            hf_delete_collection(slug)
-        except HFCollectionError as e:
-            QMessageBox.critical(self, "Error", str(e))
-            return
+        def on_success(_result):
+            self._status.showMessage("Collection deleted.", 3000)
+            self._refresh_collections()
 
-        self._status.showMessage("Collection deleted.", 3000)
-        self._refresh_collections()
+        self._run_api(
+            hf_delete_collection, args=(slug,),
+            on_success=on_success,
+        )

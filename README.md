@@ -1,4 +1,4 @@
-# 🤗 HF Hub Manager
+# 🤗 Hugging Face Client
 
 A PySide6 desktop application for managing your Hugging Face Hub account — repos, files, model cards, and collections — all from a single GUI.
 

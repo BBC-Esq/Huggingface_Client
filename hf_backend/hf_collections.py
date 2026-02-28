@@ -29,6 +29,26 @@ class CollectionInfo:
     url: str = ""
 
 
+def _to_collection_info(c) -> CollectionInfo:
+    items = []
+    for it in (c.items or []):
+        items.append(CollectionItemInfo(
+            item_id=getattr(it, "item_id", ""),
+            item_type=getattr(it, "item_type", ""),
+            note=getattr(it, "note", "") or "",
+            position=getattr(it, "position", 0),
+        ))
+    return CollectionInfo(
+        slug=c.slug,
+        title=c.title or "",
+        description=getattr(c, "description", "") or "",
+        owner=getattr(c, "owner", ""),
+        is_private=getattr(c, "is_private", False),
+        items=items,
+        url=f"https://huggingface.co/collections/{c.slug}",
+    )
+
+
 def list_my_collections(owner: str) -> List[CollectionInfo]:
     """List collections owned by the given user/org."""
     api = get_api()
@@ -48,23 +68,7 @@ def get_collection(slug: str) -> CollectionInfo:
     api = get_api()
     try:
         c = with_retry(api.get_collection, slug)
-        items = []
-        for it in (c.items or []):
-            items.append(CollectionItemInfo(
-                item_id=getattr(it, "item_id", ""),
-                item_type=getattr(it, "item_type", ""),
-                note=getattr(it, "note", "") or "",
-                position=getattr(it, "position", 0),
-            ))
-        return CollectionInfo(
-            slug=c.slug,
-            title=c.title or "",
-            description=getattr(c, "description", "") or "",
-            owner=getattr(c, "owner", ""),
-            is_private=getattr(c, "is_private", False),
-            items=items,
-            url=f"https://huggingface.co/collections/{c.slug}",
-        )
+        return _to_collection_info(c)
     except Exception as e:
         raise HFCollectionError(f"Failed to get collection: {e}") from e
 
@@ -121,7 +125,7 @@ def add_collection_item(
         if note:
             kwargs["note"] = note
         c = with_retry(api.add_collection_item, **kwargs)
-        return get_collection(c.slug)
+        return _to_collection_info(c)
     except Exception as e:
         raise HFCollectionError(f"Failed to add item: {e}") from e
 
@@ -131,7 +135,7 @@ def remove_collection_item(slug: str, item_id: str) -> CollectionInfo:
     api = get_api()
     try:
         c = with_retry(api.delete_collection_item, collection_slug=slug, item_id=item_id)
-        return get_collection(c.slug)
+        return _to_collection_info(c)
     except Exception as e:
         raise HFCollectionError(f"Failed to remove item: {e}") from e
 

@@ -695,7 +695,21 @@ class MainWindow(QMainWindow):
         self._run_api(fetch, on_success=on_success, status_msg="Loading files...", busy=False)
 
     def _on_branch_changed(self, branch: str) -> None:
-        self._refresh_files()
+        if not self._current_repo_id or not branch:
+            return
+        repo_id = self._current_repo_id
+        repo_type = self._current_repo_type
+
+        def fetch():
+            return list_repo_files(repo_id, repo_type, revision=branch)
+
+        def on_success(files):
+            if self._current_repo_id != repo_id:
+                return
+            self._browser.set_files(files)
+            self._status.showMessage(f"Loaded {len(files)} files.", 3000)
+
+        self._run_api(fetch, on_success=on_success, status_msg="Loading files...", busy=False)
 
     def _on_upload(self) -> None:
         if not self._current_repo_id:

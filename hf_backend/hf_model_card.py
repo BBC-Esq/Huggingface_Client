@@ -9,6 +9,22 @@ class HFModelCardError(RuntimeError):
     pass
 
 
+_YAML_SPECIAL = set(':{}[],"\'|>&*!#%@`\n\r')
+_YAML_BOOLS = {'true', 'false', 'yes', 'no', 'null', 'on', 'off'}
+
+
+def _yaml_quote(value: str) -> str:
+    if not value:
+        return '""'
+    if (any(ch in _YAML_SPECIAL for ch in value)
+            or value.strip() != value
+            or value.lower() in _YAML_BOOLS):
+        escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+        escaped = escaped.replace('\n', '\\n').replace('\r', '\\r')
+        return f'"{escaped}"'
+    return value
+
+
 PIPELINE_TAGS = [
     "",
     "text-generation",
@@ -130,34 +146,34 @@ def generate_model_card_yaml(
     lines = ["---"]
 
     if language:
-        lines.append(f"language: {language}")
+        lines.append(f"language: {_yaml_quote(language)}")
     if license:
-        lines.append(f"license: {license}")
+        lines.append(f"license: {_yaml_quote(license)}")
     if library_name:
-        lines.append(f"library_name: {library_name}")
+        lines.append(f"library_name: {_yaml_quote(library_name)}")
     if pipeline_tag:
-        lines.append(f"pipeline_tag: {pipeline_tag}")
+        lines.append(f"pipeline_tag: {_yaml_quote(pipeline_tag)}")
     if base_model:
-        lines.append(f"base_model: {base_model}")
+        lines.append(f"base_model: {_yaml_quote(base_model)}")
 
     if tags:
         lines.append("tags:")
         for t in tags:
-            lines.append(f"  - {t}")
+            lines.append(f"  - {_yaml_quote(t)}")
 
     if datasets:
         lines.append("datasets:")
         for d in datasets:
-            lines.append(f"  - {d}")
+            lines.append(f"  - {_yaml_quote(d)}")
 
     if extra_metadata:
         for k, v in extra_metadata.items():
             if isinstance(v, list):
                 lines.append(f"{k}:")
                 for item in v:
-                    lines.append(f"  - {item}")
+                    lines.append(f"  - {_yaml_quote(str(item))}")
             else:
-                lines.append(f"{k}: {v}")
+                lines.append(f"{k}: {_yaml_quote(str(v))}")
 
     lines.append("---")
     return "\n".join(lines)

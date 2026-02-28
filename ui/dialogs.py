@@ -472,6 +472,14 @@ class AddToCollectionDialog(QDialog):
             return
         self.accept()
 
+    def set_defaults(self, item_id: str = "", item_type: str = "") -> None:
+        if item_id:
+            self._item_id.setText(item_id)
+        if item_type:
+            idx = self._item_type.findData(item_type)
+            if idx >= 0:
+                self._item_type.setCurrentIndex(idx)
+
     def get_details(self) -> dict:
         return {
             "item_id": self._item_id.text().strip(),

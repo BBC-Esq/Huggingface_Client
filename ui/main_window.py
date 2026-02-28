@@ -1051,10 +1051,7 @@ class MainWindow(QMainWindow):
         dlg = AddToCollectionDialog(parent=self)
 
         if self._current_repo_id:
-            dlg._item_id.setText(self._current_repo_id)
-            idx = dlg._item_type.findData(self._current_repo_type)
-            if idx >= 0:
-                dlg._item_type.setCurrentIndex(idx)
+            dlg.set_defaults(self._current_repo_id, self._current_repo_type)
 
         if dlg.exec() != QDialog.Accepted:
             return

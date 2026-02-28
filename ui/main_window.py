@@ -88,6 +88,7 @@ class MainWindow(QMainWindow):
         self._current_repo_id: str = ""
         self._current_repo_type: str = "model"
         self._workers: set = set()
+        self._readme_cache: dict[tuple, str] = {}
 
         self._build_ui()
         self._connect_signals()
@@ -289,7 +290,7 @@ class MainWindow(QMainWindow):
         self._browser.request_download_file.connect(self._on_download_file)
         self._browser.branch_changed.connect(self._on_branch_changed)
 
-        self._btn_load_readme.clicked.connect(self._load_readme)
+        self._btn_load_readme.clicked.connect(lambda: self._load_readme(force_refresh=True))
         self._btn_edit_readme.clicked.connect(self._on_edit_readme)
         self._btn_new_model_card.clicked.connect(self._on_new_model_card)
 
@@ -377,6 +378,7 @@ class MainWindow(QMainWindow):
     def _on_logout(self) -> None:
         self._user = None
         self._settings.set_hf_token("")
+        self._readme_cache.clear()
         self._user_label.setText("Not logged in")
         self._btn_login.setEnabled(True)
         self._btn_logout.setEnabled(False)
@@ -791,17 +793,24 @@ class MainWindow(QMainWindow):
 
     # ── README / model card ────────────────────────────────────────
 
-    def _load_readme(self) -> None:
+    def _load_readme(self, *, force_refresh: bool = False) -> None:
         if not self._current_repo_id:
             self._readme_view.clear()
             return
 
         repo_id = self._current_repo_id
         repo_type = self._current_repo_type
+        cache_key = (repo_id, repo_type)
+
+        if not force_refresh and cache_key in self._readme_cache:
+            content = self._readme_cache[cache_key]
+            self._readme_view.setPlainText(content if content else "(No README.md found)")
+            return
 
         def on_success(content):
             if self._current_repo_id != repo_id:
                 return
+            self._readme_cache[cache_key] = content
             self._readme_view.setPlainText(content if content else "(No README.md found)")
             self._status.clearMessage()
 
@@ -838,8 +847,9 @@ class MainWindow(QMainWindow):
         repo_type = self._current_repo_type
 
         def on_success(_result):
+            self._readme_cache[(repo_id, repo_type)] = new_content
+            self._readme_view.setPlainText(new_content if new_content else "(No README.md found)")
             self._status.showMessage("README saved.", 3000)
-            self._load_readme()
             self._refresh_files()
 
         self._run_api(
@@ -870,8 +880,9 @@ class MainWindow(QMainWindow):
         repo_type = self._current_repo_type
 
         def on_success(_result):
+            self._readme_cache[(repo_id, repo_type)] = content
+            self._readme_view.setPlainText(content)
             self._status.showMessage("Model card pushed.", 3000)
-            self._load_readme()
             self._refresh_files()
 
         self._run_api(

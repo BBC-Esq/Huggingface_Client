@@ -6,6 +6,7 @@ from huggingface_hub import HfApi
 from huggingface_hub.utils import RepositoryNotFoundError
 
 from hf_backend.hf_auth import get_api
+from hf_backend.retry import with_retry
 
 
 class HFRepoError(RuntimeError):
@@ -44,13 +45,15 @@ def list_my_repos(
     api = get_api()
     try:
         if repo_type == "model":
-            items = api.list_models(author=author, search=search, sort=sort, limit=limit)
+            items = with_retry(api.list_models, author=author, search=search, sort=sort, limit=limit)
         elif repo_type == "dataset":
-            items = api.list_datasets(author=author, search=search, sort=sort, limit=limit)
+            items = with_retry(api.list_datasets, author=author, search=search, sort=sort, limit=limit)
         elif repo_type == "space":
-            items = api.list_spaces(author=author, search=search, sort=sort, limit=limit)
+            items = with_retry(api.list_spaces, author=author, search=search, sort=sort, limit=limit)
         else:
             raise HFRepoError(f"Unknown repo type: {repo_type}")
+    except HFRepoError:
+        raise
     except Exception as e:
         raise HFRepoError(f"Failed to list repos: {e}") from e
 
@@ -85,7 +88,8 @@ def create_repo(
     """Create a new repo. Returns the URL of the created repo."""
     api = get_api()
     try:
-        result = api.create_repo(
+        result = with_retry(
+            api.create_repo,
             repo_id=repo_id,
             repo_type=repo_type,
             private=private,
@@ -100,7 +104,7 @@ def delete_repo(repo_id: str, repo_type: str = "model") -> None:
     """Delete a repository permanently."""
     api = get_api()
     try:
-        api.delete_repo(repo_id=repo_id, repo_type=repo_type)
+        with_retry(api.delete_repo, repo_id=repo_id, repo_type=repo_type)
     except Exception as e:
         raise HFRepoError(f"Failed to delete repo: {e}") from e
 
@@ -109,7 +113,7 @@ def update_repo_visibility(repo_id: str, repo_type: str, private: bool) -> None:
     """Change the visibility of a repo."""
     api = get_api()
     try:
-        api.update_repo_settings(repo_id=repo_id, repo_type=repo_type, private=private)
+        with_retry(api.update_repo_settings, repo_id=repo_id, repo_type=repo_type, private=private)
     except Exception as e:
         raise HFRepoError(f"Failed to update visibility: {e}") from e
 
@@ -119,13 +123,15 @@ def get_repo_info(repo_id: str, repo_type: str = "model") -> RepoInfo:
     api = get_api()
     try:
         if repo_type == "model":
-            info = api.model_info(repo_id)
+            info = with_retry(api.model_info, repo_id)
         elif repo_type == "dataset":
-            info = api.dataset_info(repo_id)
+            info = with_retry(api.dataset_info, repo_id)
         elif repo_type == "space":
-            info = api.space_info(repo_id)
+            info = with_retry(api.space_info, repo_id)
         else:
             raise HFRepoError(f"Unknown repo type: {repo_type}")
+    except HFRepoError:
+        raise
     except RepositoryNotFoundError:
         raise HFRepoError(f"Repository not found: {repo_id}")
     except Exception as e:
@@ -153,13 +159,15 @@ def list_repo_files(repo_id: str, repo_type: str = "model", revision: str = "mai
     api = get_api()
     try:
         if repo_type == "model":
-            info = api.model_info(repo_id, revision=revision, files_metadata=True)
+            info = with_retry(api.model_info, repo_id, revision=revision, files_metadata=True)
         elif repo_type == "dataset":
-            info = api.dataset_info(repo_id, revision=revision, files_metadata=True)
+            info = with_retry(api.dataset_info, repo_id, revision=revision, files_metadata=True)
         elif repo_type == "space":
-            info = api.space_info(repo_id, revision=revision, files_metadata=True)
+            info = with_retry(api.space_info, repo_id, revision=revision, files_metadata=True)
         else:
             raise HFRepoError(f"Unknown repo type: {repo_type}")
+    except HFRepoError:
+        raise
     except Exception as e:
         raise HFRepoError(f"Failed to list files: {e}") from e
 
@@ -179,7 +187,7 @@ def list_repo_refs(repo_id: str, repo_type: str = "model") -> dict:
     """List branches and tags of a repo."""
     api = get_api()
     try:
-        refs = api.list_repo_refs(repo_id=repo_id, repo_type=repo_type)
+        refs = with_retry(api.list_repo_refs, repo_id=repo_id, repo_type=repo_type)
         branches = [b.name for b in (refs.branches or [])]
         tags = [t.name for t in (refs.tags or [])]
         return {"branches": branches, "tags": tags}

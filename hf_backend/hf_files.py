@@ -5,6 +5,7 @@ from typing import Optional
 from huggingface_hub import HfApi
 
 from hf_backend.hf_auth import get_api
+from hf_backend.retry import with_retry
 
 
 class HFFileError(RuntimeError):
@@ -22,7 +23,8 @@ def upload_file(
     """Upload a single file. Returns the commit URL."""
     api = get_api()
     try:
-        result = api.upload_file(
+        result = with_retry(
+            api.upload_file,
             path_or_fileobj=local_path,
             path_in_repo=path_in_repo,
             repo_id=repo_id,
@@ -55,7 +57,8 @@ def upload_folder(
             "Thumbs.db",
         ]
     try:
-        result = api.upload_folder(
+        result = with_retry(
+            api.upload_folder,
             folder_path=folder_path,
             path_in_repo=path_in_repo if path_in_repo != "." else "",
             repo_id=repo_id,
@@ -79,7 +82,8 @@ def download_file(
     """Download a single file. Returns the local path."""
     api = get_api()
     try:
-        path = api.hf_hub_download(
+        path = with_retry(
+            api.hf_hub_download,
             repo_id=repo_id,
             filename=filename,
             local_dir=local_dir,
@@ -101,7 +105,8 @@ def delete_file(
     """Delete a single file from the repo."""
     api = get_api()
     try:
-        api.delete_file(
+        with_retry(
+            api.delete_file,
             path_in_repo=path_in_repo,
             repo_id=repo_id,
             repo_type=repo_type,
@@ -124,7 +129,8 @@ def delete_files(
     try:
         from huggingface_hub import CommitOperationDelete
         operations = [CommitOperationDelete(path_in_repo=p) for p in paths_in_repo]
-        api.create_commit(
+        with_retry(
+            api.create_commit,
             repo_id=repo_id,
             repo_type=repo_type,
             operations=operations,
@@ -144,9 +150,10 @@ def get_file_content(
     """Download and read a text file from the repo. Returns file contents."""
     api = get_api()
     try:
-        import tempfile, os
+        import tempfile
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = api.hf_hub_download(
+            path = with_retry(
+                api.hf_hub_download,
                 repo_id=repo_id,
                 filename=path_in_repo,
                 local_dir=tmpdir,
@@ -172,7 +179,8 @@ def upload_file_content(
     try:
         if isinstance(content, str):
             content = content.encode("utf-8")
-        result = api.upload_file(
+        result = with_retry(
+            api.upload_file,
             path_or_fileobj=content,
             path_in_repo=path_in_repo,
             repo_id=repo_id,

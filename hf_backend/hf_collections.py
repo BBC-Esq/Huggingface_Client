@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from hf_backend.hf_auth import get_api
+from hf_backend.retry import with_retry
 
 
 class HFCollectionError(RuntimeError):
@@ -32,7 +33,7 @@ def list_my_collections(owner: str) -> List[CollectionInfo]:
     """List collections owned by the given user/org."""
     api = get_api()
     try:
-        collections = api.list_collections(owner=owner)
+        collections = with_retry(api.list_collections, owner=owner)
         results = []
         for c in collections:
             items = []
@@ -61,7 +62,7 @@ def get_collection(slug: str) -> CollectionInfo:
     """Get detailed info about a collection."""
     api = get_api()
     try:
-        c = api.get_collection(slug)
+        c = with_retry(api.get_collection, slug)
         items = []
         for it in (c.items or []):
             items.append(CollectionItemInfo(
@@ -95,7 +96,7 @@ def create_collection(
         kwargs = {"title": title, "description": description, "private": private}
         if namespace:
             kwargs["namespace"] = namespace
-        c = api.create_collection(**kwargs)
+        c = with_retry(api.create_collection, **kwargs)
         return CollectionInfo(
             slug=c.slug,
             title=c.title or title,
@@ -113,7 +114,7 @@ def delete_collection(slug: str) -> None:
     """Delete a collection."""
     api = get_api()
     try:
-        api.delete_collection(slug)
+        with_retry(api.delete_collection, slug)
     except Exception as e:
         raise HFCollectionError(f"Failed to delete collection: {e}") from e
 
@@ -134,7 +135,7 @@ def add_collection_item(
         }
         if note:
             kwargs["note"] = note
-        c = api.add_collection_item(**kwargs)
+        c = with_retry(api.add_collection_item, **kwargs)
         return get_collection(c.slug)
     except Exception as e:
         raise HFCollectionError(f"Failed to add item: {e}") from e
@@ -144,7 +145,7 @@ def remove_collection_item(slug: str, item_id: str) -> CollectionInfo:
     """Remove an item from a collection."""
     api = get_api()
     try:
-        c = api.delete_collection_item(collection_slug=slug, item_id=item_id)
+        c = with_retry(api.delete_collection_item, collection_slug=slug, item_id=item_id)
         return get_collection(c.slug)
     except Exception as e:
         raise HFCollectionError(f"Failed to remove item: {e}") from e
@@ -166,6 +167,6 @@ def update_collection_metadata(
             kwargs["description"] = description
         if private is not None:
             kwargs["private"] = private
-        api.update_collection_metadata(**kwargs)
+        with_retry(api.update_collection_metadata, **kwargs)
     except Exception as e:
         raise HFCollectionError(f"Failed to update collection: {e}") from e

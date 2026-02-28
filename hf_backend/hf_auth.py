@@ -5,6 +5,8 @@ from typing import Optional
 from huggingface_hub import HfApi
 from huggingface_hub.utils import get_token as _hf_get_token
 
+from hf_backend.retry import with_retry
+
 
 class HFAuthError(RuntimeError):
     pass
@@ -38,7 +40,7 @@ def login(token: str) -> UserInfo:
 
     api = get_api(token)
     try:
-        info = api.whoami()
+        info = with_retry(api.whoami)
     except Exception as e:
         _reset_api()
         raise HFAuthError(f"Login failed: {e}") from e
@@ -66,7 +68,7 @@ def whoami(token: str | None = None) -> UserInfo | None:
     """Return user info if logged in, else None."""
     try:
         api = get_api(token)
-        info = api.whoami()
+        info = with_retry(api.whoami)
         orgs = [o.get("name", "") for o in info.get("orgs", [])]
         return UserInfo(
             username=info.get("name", ""),

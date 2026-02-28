@@ -367,10 +367,16 @@ class MainWindow(QMainWindow):
         if not token:
             token = get_cached_token()
         if token:
+            def _on_auto_login_fail(_msg):
+                self._settings.set_hf_token("")
+                self._status.showMessage(
+                    "Saved token is no longer valid \u2013 please log in again.", 8000
+                )
+
             self._run_api(
                 login, args=(token,),
                 on_success=lambda user: self._on_login_success(user, token),
-                on_error=lambda _msg: None,
+                on_error=_on_auto_login_fail,
                 busy=False,
             )
 

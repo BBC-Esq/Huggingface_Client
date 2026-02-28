@@ -1,10 +1,10 @@
 from __future__ import annotations
 import time
-from requests.exceptions import ConnectionError, Timeout
-from urllib3.exceptions import ProtocolError
+
+from httpx import ConnectError, TimeoutException, NetworkError, ProtocolError
 
 
-RETRYABLE_EXCEPTIONS = (ConnectionError, Timeout, ProtocolError, OSError)
+RETRYABLE_EXCEPTIONS = (ConnectError, TimeoutException, NetworkError, ProtocolError, OSError)
 
 
 def with_retry(fn, *args, retries: int = 3, delay: float = 1.0, **kwargs):

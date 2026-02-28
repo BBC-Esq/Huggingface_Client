@@ -160,8 +160,17 @@ def get_file_content(
                 repo_type=repo_type,
                 revision=revision,
             )
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                return f.read()
+            with open(path, "rb") as f:
+                raw = f.read()
+            try:
+                return raw.decode("utf-8")
+            except UnicodeDecodeError:
+                raise HFFileError(
+                    f"'{path_in_repo}' is not valid UTF-8 text and cannot be "
+                    f"opened in the editor. It may be a binary file."
+                )
+    except HFFileError:
+        raise
     except Exception as e:
         raise HFFileError(f"Failed to get file content: {e}") from e
 

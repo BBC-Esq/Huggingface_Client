@@ -1,6 +1,6 @@
-# 🤗 Huggingface Client
+# 🤗 Hugging Face Client
 
-A desktop application for managing your Hugging Face Hub repositories, files, and collections — built with PySide6 and the `huggingface_hub` library.  It provides a graphical user interface for common operations such as browsing your repos, managing files, editing READMEs, generating model cards, organizing collections and more!
+A desktop application for managing your Hugging Face repositories, files, and collections — built with PySide6 and the `huggingface_hub` library.  It provides a graphical user interface for common operations such as browsing your repos, managing files, editing READMEs, generating model cards, organizing collections and more!
 
 ## Getting Started
 

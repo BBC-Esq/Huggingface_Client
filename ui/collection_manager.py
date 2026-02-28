@@ -18,7 +18,6 @@ from hf_backend.hf_collections import CollectionInfo
 
 
 class CollectionManager(QWidget):
-    """Widget for browsing and managing HF collections."""
 
     request_refresh = Signal()
     request_create = Signal()

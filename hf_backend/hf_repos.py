@@ -30,7 +30,6 @@ class RepoInfo:
 
 @dataclass
 class RepoFileEntry:
-    """One file (or LFS pointer) in a repo."""
     rfilename: str
     size: int
     blob_id: str
@@ -44,7 +43,6 @@ def list_my_repos(
     sort: str = "lastModified",
     limit: int | None = None,
 ) -> List[RepoInfo]:
-    """List repos owned by the current user (or a specified author)."""
     api = get_api()
     try:
         if repo_type == "model":
@@ -89,7 +87,6 @@ def create_repo(
     private: bool = False,
     exist_ok: bool = False,
 ) -> str:
-    """Create a new repo. Returns the URL of the created repo."""
     api = get_api()
     try:
         result = with_retry(
@@ -106,7 +103,6 @@ def create_repo(
 
 
 def delete_repo(repo_id: str, repo_type: str = "model") -> None:
-    """Delete a repository permanently."""
     api = get_api()
     try:
         with_retry(api.delete_repo, repo_id=repo_id, repo_type=repo_type)
@@ -116,7 +112,6 @@ def delete_repo(repo_id: str, repo_type: str = "model") -> None:
 
 
 def update_repo_visibility(repo_id: str, repo_type: str, private: bool) -> None:
-    """Change the visibility of a repo."""
     api = get_api()
     try:
         with_retry(api.update_repo_settings, repo_id=repo_id, repo_type=repo_type, private=private)
@@ -126,7 +121,6 @@ def update_repo_visibility(repo_id: str, repo_type: str, private: bool) -> None:
 
 
 def get_repo_info(repo_id: str, repo_type: str = "model") -> RepoInfo:
-    """Get detailed info about a single repo."""
     api = get_api()
     try:
         if repo_type == "model":
@@ -164,7 +158,6 @@ def get_repo_info(repo_id: str, repo_type: str = "model") -> RepoInfo:
 
 
 def list_repo_files(repo_id: str, repo_type: str = "model", revision: str = "main") -> List[RepoFileEntry]:
-    """List all files in a repo."""
     api = get_api()
     try:
         if repo_type == "model":
@@ -194,7 +187,6 @@ def list_repo_files(repo_id: str, repo_type: str = "model", revision: str = "mai
 
 
 def list_repo_refs(repo_id: str, repo_type: str = "model") -> dict:
-    """List branches and tags of a repo."""
     api = get_api()
     try:
         refs = with_retry(api.list_repo_refs, repo_id=repo_id, repo_type=repo_type)

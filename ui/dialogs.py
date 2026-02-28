@@ -28,7 +28,6 @@ from hf_backend.hf_model_card import (
 
 
 class LoginDialog(QDialog):
-    """Dialog to enter an HF access token."""
 
     def __init__(self, initial_token: str = "", parent=None) -> None:
         super().__init__(parent)
@@ -75,7 +74,6 @@ class LoginDialog(QDialog):
 
 
 class CreateRepoDialog(QDialog):
-    """Dialog to create a new HF repository."""
 
     def __init__(self, username: str = "", orgs: list[str] | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -144,7 +142,6 @@ class CreateRepoDialog(QDialog):
 
 
 class UploadDialog(QDialog):
-    """Dialog to upload files or a folder to a repo."""
 
     def __init__(self, repo_id: str = "", last_dir: str = "", parent=None) -> None:
         super().__init__(parent)
@@ -235,7 +232,6 @@ class UploadDialog(QDialog):
 
 
 class ModelCardDialog(QDialog):
-    """Dialog to generate a new model card from a template."""
 
     def __init__(self, existing_content: str = "", parent=None) -> None:
         super().__init__(parent)
@@ -377,7 +373,6 @@ class ModelCardDialog(QDialog):
 
 
 class CreateCollectionDialog(QDialog):
-    """Dialog to create a new collection."""
 
     def __init__(self, username: str = "", orgs: list[str] | None = None, parent=None) -> None:
         super().__init__(parent)
@@ -431,7 +426,6 @@ class CreateCollectionDialog(QDialog):
 
 
 class AddToCollectionDialog(QDialog):
-    """Dialog to add an item to a collection."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -489,7 +483,6 @@ class AddToCollectionDialog(QDialog):
 
 
 class TextEditorDialog(QDialog):
-    """Generic text editor dialog for editing files remotely."""
 
     def __init__(self, title: str, content: str = "", parent=None) -> None:
         super().__init__(parent)

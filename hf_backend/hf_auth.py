@@ -28,7 +28,6 @@ _api_instance: Optional[HfApi] = None
 
 
 def get_api(token: str | None = None) -> HfApi:
-    """Return a shared HfApi instance, optionally setting the token."""
     global _api_instance
     if _api_instance is None or token is not None:
         _api_instance = HfApi(token=token if token else None)
@@ -36,7 +35,6 @@ def get_api(token: str | None = None) -> HfApi:
 
 
 def login(token: str) -> UserInfo:
-    """Validate a token and return user info. Raises HFAuthError on failure."""
     token = token.strip()
     if not token:
         raise HFAuthError("Token cannot be empty.")
@@ -61,7 +59,6 @@ def login(token: str) -> UserInfo:
 
 
 def get_cached_token() -> str:
-    """Try to get a token from HF's default cache (~/.cache/huggingface/token)."""
     try:
         t = _hf_get_token()
         return t or ""
@@ -70,7 +67,6 @@ def get_cached_token() -> str:
 
 
 def whoami(token: str | None = None) -> UserInfo | None:
-    """Return user info if logged in, else None."""
     try:
         api = get_api(token)
         info = with_retry(api.whoami)

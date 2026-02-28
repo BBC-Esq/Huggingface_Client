@@ -145,7 +145,7 @@ def generate_model_card_yaml(
     datasets: list[str] | None = None,
     extra_metadata: dict | None = None,
 ) -> str:
-    """Generate the YAML frontmatter for a model card."""
+
     lines = ["---"]
 
     if language:
@@ -198,7 +198,7 @@ def generate_model_card(
     limitations: str = "",
     extra_metadata: dict | None = None,
 ) -> str:
-    """Generate a full model card (YAML + Markdown body)."""
+
     yaml = generate_model_card_yaml(
         language=language,
         license=license,
@@ -248,7 +248,7 @@ def generate_model_card(
 
 
 def get_readme(repo_id: str, repo_type: str = "model") -> str:
-    """Fetch the current README.md from a repo."""
+
     try:
         return get_file_content(repo_id, "README.md", repo_type=repo_type)
     except HFFileError as e:
@@ -262,7 +262,7 @@ def push_readme(
     repo_type: str = "model",
     commit_message: str = "Update README.md",
 ) -> str:
-    """Push a README.md to a repo."""
+
     try:
         return upload_file_content(
             repo_id=repo_id,

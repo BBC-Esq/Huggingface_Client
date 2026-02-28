@@ -33,7 +33,6 @@ def _human_size(size: int) -> str:
 
 
 class RepoBrowser(QWidget):
-    """Displays files in a HF repo as a flat tree with folder grouping."""
 
     file_selected = Signal(str)
     request_edit_file = Signal(str)
@@ -116,7 +115,6 @@ class RepoBrowser(QWidget):
         return self._branch_combo.currentText()
 
     def set_files(self, entries: list[RepoFileEntry]) -> None:
-        """Populate the tree from a flat list of file entries."""
         self._tree.clear()
 
         folder_items: dict[str, QTreeWidgetItem] = {}

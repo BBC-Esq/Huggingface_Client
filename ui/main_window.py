@@ -100,7 +100,6 @@ class MainWindow(QMainWindow):
         self._restore_window()
         self._try_auto_login()
 
-    # ── worker helper ──────────────────────────────────────────────
 
     def _run_api(
         self,
@@ -112,7 +111,7 @@ class MainWindow(QMainWindow):
         status_msg: str | None = None,
         busy: bool = True,
     ):
-        """Run *fn* in a background thread, delivering results on the main thread."""
+
         worker = ApiWorker(fn, *args, **(kwargs or {}))
 
         def _on_finished(result):
@@ -164,7 +163,6 @@ class MainWindow(QMainWindow):
         self._browser.set_actions_enabled(enabled)
         self._collections.set_actions_enabled(enabled)
 
-    # ── UI construction ────────────────────────────────────────────
 
     def _build_ui(self) -> None:
         self._root = QWidget()
@@ -375,7 +373,6 @@ class MainWindow(QMainWindow):
         self._settings.set_splitter_state(self._splitter.saveState())
         super().closeEvent(event)
 
-    # ── authentication ─────────────────────────────────────────────
 
     def _try_auto_login(self) -> None:
         token = self._settings.get_hf_token()
@@ -439,7 +436,6 @@ class MainWindow(QMainWindow):
         self._repo_info_label.setText("Select a repository from the list")
         self._status.showMessage("Logged out.", 3000)
 
-    # ── repository list ────────────────────────────────────────────
 
     def _refresh_repos(self) -> None:
         if not self._user:
@@ -656,7 +652,6 @@ class MainWindow(QMainWindow):
         url = f"https://huggingface.co/{type_prefix}{self._current_repo_id}"
         webbrowser.open(url)
 
-    # ── file browser ───────────────────────────────────────────────
 
     def _refresh_files(self) -> None:
         if not self._current_repo_id:
@@ -910,7 +905,6 @@ class MainWindow(QMainWindow):
             status_msg=f"Downloading {rfilename}...",
         )
 
-    # ── README / model card ────────────────────────────────────────
 
     def _load_readme(self, *, force_refresh: bool = False) -> None:
         if not self._current_repo_id:
@@ -1013,7 +1007,6 @@ class MainWindow(QMainWindow):
             status_msg="Pushing model card...",
         )
 
-    # ── collections ────────────────────────────────────────────────
 
     def _refresh_collections(self) -> None:
         if not self._user:

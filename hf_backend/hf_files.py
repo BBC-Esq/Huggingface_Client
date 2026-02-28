@@ -23,7 +23,7 @@ def upload_file(
     commit_message: str = "Upload file",
     revision: str = "main",
 ) -> str:
-    """Upload a single file. Returns the commit URL."""
+
     api = get_api()
     try:
         result = with_retry(
@@ -50,7 +50,7 @@ def upload_folder(
     revision: str = "main",
     ignore_patterns: list[str] | None = None,
 ) -> str:
-    """Upload an entire folder. Returns the commit URL."""
+
     api = get_api()
     if ignore_patterns is None:
         ignore_patterns = [
@@ -84,7 +84,7 @@ def download_file(
     repo_type: str = "model",
     revision: str = "main",
 ) -> str:
-    """Download a single file. Returns the local path."""
+
     api = get_api()
     try:
         path = with_retry(
@@ -108,7 +108,7 @@ def delete_file(
     commit_message: str = "Delete file",
     revision: str = "main",
 ) -> None:
-    """Delete a single file from the repo."""
+
     api = get_api()
     try:
         with_retry(
@@ -131,7 +131,7 @@ def delete_files(
     commit_message: str = "Delete files",
     revision: str = "main",
 ) -> None:
-    """Delete multiple files from the repo in a single commit."""
+
     api = get_api()
     try:
         from huggingface_hub import CommitOperationDelete
@@ -155,7 +155,7 @@ def get_file_content(
     repo_type: str = "model",
     revision: str = "main",
 ) -> str:
-    """Download and read a text file from the repo. Returns file contents."""
+
     api = get_api()
     try:
         import tempfile
@@ -193,7 +193,7 @@ def upload_file_content(
     commit_message: str = "Update file",
     revision: str = "main",
 ) -> str:
-    """Upload content directly as a file (e.g. for README edits). Returns commit URL."""
+
     api = get_api()
     try:
         if isinstance(content, str):

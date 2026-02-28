@@ -53,7 +53,7 @@ def _to_collection_info(c) -> CollectionInfo:
 
 
 def list_my_collections(owner: str) -> List[CollectionInfo]:
-    """List collections owned by the given user/org."""
+
     api = get_api()
     try:
         collections = with_retry(api.list_collections, owner=owner)
@@ -68,7 +68,7 @@ def list_my_collections(owner: str) -> List[CollectionInfo]:
 
 
 def get_collection(slug: str) -> CollectionInfo:
-    """Get detailed info about a collection."""
+
     api = get_api()
     try:
         c = with_retry(api.get_collection, slug)
@@ -84,7 +84,7 @@ def create_collection(
     description: str = "",
     private: bool = False,
 ) -> CollectionInfo:
-    """Create a new collection."""
+
     api = get_api()
     try:
         kwargs = {"title": title, "description": description, "private": private}
@@ -106,7 +106,7 @@ def create_collection(
 
 
 def delete_collection(slug: str) -> None:
-    """Delete a collection."""
+
     api = get_api()
     try:
         with_retry(api.delete_collection, slug)
@@ -121,7 +121,7 @@ def add_collection_item(
     item_type: str,
     note: str = "",
 ) -> CollectionInfo:
-    """Add an item to a collection."""
+
     api = get_api()
     try:
         kwargs = {
@@ -139,7 +139,7 @@ def add_collection_item(
 
 
 def remove_collection_item(slug: str, item_id: str) -> CollectionInfo:
-    """Remove an item from a collection."""
+
     api = get_api()
     try:
         c = with_retry(api.delete_collection_item, collection_slug=slug, item_id=item_id)
@@ -155,7 +155,7 @@ def update_collection_metadata(
     description: str | None = None,
     private: bool | None = None,
 ) -> None:
-    """Update collection title/description/visibility."""
+
     api = get_api()
     try:
         kwargs: dict = {"collection_slug": slug}

@@ -1,23 +1,31 @@
-# HF Hub Manager
+# 🤗 HF Hub Manager
 
-A PySide6 desktop application for managing your Hugging Face Hub account — repositories, files, model cards, and collections — all from a single GUI.
+A PySide6 desktop application for managing your Hugging Face Hub account — repos, files, model cards, and collections — all from a single GUI.
 
-## Features
+---
 
-- **Authentication**: Login with your Hugging Face access token (persisted securely via OS settings); auto-detects cached tokens from `huggingface-cli login` on startup
-- **Repository Management**: Create, browse, delete, and toggle visibility of models, datasets, and spaces
-- **Favorites**: Mark repos as favorites and filter the list to show only favorites
-- **Search & Filtering**: Filter your repo list by keyword; switch between Models, Datasets, and Spaces via dropdown
-- **File Browser**: Browse repo file trees with branch selection, upload files/folders, download, edit text files in the built-in editor, and delete — all with commit messages
-- **File Size Guard**: Text files over 10 MB are blocked from the built-in editor with guidance to download, edit locally, and re-upload
-- **README / Model Card Editor**: View, edit, or generate model cards from a structured template with YAML frontmatter (license, pipeline tag, library, language, tags, base model, datasets, etc.)
-- **Collections**: Create, browse, add items to, remove items from, and delete Hugging Face collections
-- **Branch Support**: Switch between branches when browsing files; the default branch is detected automatically from the repo's refs
-- **Retry with Backoff**: API calls automatically retry on transient network errors and HTTP 5xx responses
-- **Logging**: Timestamped log files are written to the `logs/` directory for diagnostics
-- **Window State Persistence**: Window size, position, splitter state, last repo type, and favorites filter are remembered between sessions
+## ✨ Features
 
-## Installation
+| | Feature | Description |
+|---|---|---|
+| 🔐 | **Authentication** | Login with your HF access token; auto-detects cached tokens from `huggingface-cli login` |
+| 📦 | **Repo Management** | Create, browse, delete, and toggle visibility of models, datasets, and spaces |
+| ⭐ | **Favorites** | Mark repos as favorites and filter to show only your starred picks |
+| 🔍 | **Search & Filter** | Filter repos by keyword; switch between Models, Datasets, and Spaces |
+| 📂 | **File Browser** | Browse file trees, upload files/folders, download, edit text files, and delete — with commit messages and branch selection |
+| 📝 | **README / Model Card Editor** | View, edit, or generate model cards from a structured template with YAML frontmatter |
+| 📚 | **Collections** | Create, browse, add/remove items, and delete Hugging Face collections |
+| 🌿 | **Branch Support** | Switch branches when browsing; default branch detected automatically from repo refs |
+| 🔄 | **Retry with Backoff** | API calls auto-retry on network errors and HTTP 5xx responses |
+| 🪵 | **Logging** | Timestamped log files in `logs/` for diagnostics |
+| 💾 | **Session Persistence** | Window size, position, splitter state, last repo type, and favorites filter remembered across sessions |
+
+> [!NOTE]
+> Text files over 10 MB are blocked from the built-in editor. You'll get guidance to download, edit locally, and re-upload instead.
+
+---
+
+## 🚀 Installation
 
 ```bash
 pip install PySide6 huggingface_hub
@@ -29,29 +37,40 @@ Or using the requirements file:
 pip install -r requirements.txt
 ```
 
-## Usage
+---
+
+## 🖥️ Usage
 
 ```bash
 python main.py
 ```
 
 1. Click **Login** and paste your Hugging Face access token (get one at https://huggingface.co/settings/tokens — you need a token with `write` scope).
-2. Your repositories will load automatically. Use the dropdown to switch between Models, Datasets, and Spaces.
+2. Your repositories load automatically. Use the dropdown to switch between Models, Datasets, and Spaces.
 3. Select a repo from the left panel to browse its files, view/edit its README, or manage collections.
 
-## Key Keyboard Shortcuts & Interactions
+---
 
-- **Double-click** a text file in the file browser to edit it (files over 10 MB show guidance instead)
-- **Right-click** files for context menu (edit, download, delete); multi-select supported for batch delete
-- **Right-click** a repo in the list to add/remove it from favorites
-- **Right-click** a collection for add item, open in browser, or delete; right-click an item to remove it
-- **Click column headers** in the repo list to sort by name, visibility, downloads, likes, or modified date
-- **Enter** in the search box to filter repos
-- All destructive actions (delete repo, delete files, delete collection) require confirmation
+## ⌨️ Keyboard Shortcuts & Interactions
 
-## Notes
+| Action | What it does |
+|---|---|
+| **Double-click** a text file | Open it in the built-in editor |
+| **Right-click** a file | Context menu: edit, download, delete (multi-select for batch delete) |
+| **Right-click** a repo | Add/remove from favorites |
+| **Right-click** a collection | Add item, open in browser, or delete |
+| **Right-click** a collection item | Remove it from the collection |
+| **Click a column header** | Sort repos by name, visibility, downloads, likes, or modified date |
+| **Enter** in the search box | Filter repos by keyword |
 
-- The app uses the `huggingface_hub` Python library under the hood — all operations go through the official HF API
+> [!IMPORTANT]
+> All destructive actions (delete repo, delete files, delete collection) require confirmation.
+
+---
+
+## 📌 Notes
+
+- Built on the [`huggingface_hub`](https://github.com/huggingface/huggingface_hub) Python library — all operations go through the official HF API
 - Large file uploads use HF's built-in LFS support automatically
-- Your token is stored via `QSettings` (OS-level settings storage) — on Linux this is typically in `~/.config/LocalTools/HFHubManager.conf`
-- Log files are saved to the `logs/` directory in the project root, with automatic cleanup keeping the 10 most recent files
+- Your token is stored via `QSettings` (OS-level settings storage)
+- Log files are saved to `logs/` with automatic cleanup keeping the 10 most recent files

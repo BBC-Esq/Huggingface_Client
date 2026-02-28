@@ -36,23 +36,8 @@ def list_my_collections(owner: str) -> List[CollectionInfo]:
         collections = with_retry(api.list_collections, owner=owner)
         results = []
         for c in collections:
-            items = []
-            for it in (c.items or []):
-                items.append(CollectionItemInfo(
-                    item_id=getattr(it, "item_id", ""),
-                    item_type=getattr(it, "item_type", ""),
-                    note=getattr(it, "note", "") or "",
-                    position=getattr(it, "position", 0),
-                ))
-            results.append(CollectionInfo(
-                slug=c.slug,
-                title=c.title or "",
-                description=getattr(c, "description", "") or "",
-                owner=getattr(c, "owner", owner),
-                is_private=getattr(c, "is_private", False),
-                items=items,
-                url=f"https://huggingface.co/collections/{c.slug}",
-            ))
+            full = get_collection(c.slug)
+            results.append(full)
         return results
     except Exception as e:
         raise HFCollectionError(f"Failed to list collections: {e}") from e

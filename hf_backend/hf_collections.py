@@ -1,9 +1,12 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
 
 from hf_backend.hf_auth import get_api
 from hf_backend.retry import with_retry
+
+logger = logging.getLogger(__name__)
 
 
 class HFCollectionError(RuntimeError):
@@ -60,6 +63,7 @@ def list_my_collections(owner: str) -> List[CollectionInfo]:
             results.append(full)
         return results
     except Exception as e:
+        logger.error("Failed to list collections for %s: %s", owner, e)
         raise HFCollectionError(f"Failed to list collections: {e}") from e
 
 
@@ -70,6 +74,7 @@ def get_collection(slug: str) -> CollectionInfo:
         c = with_retry(api.get_collection, slug)
         return _to_collection_info(c)
     except Exception as e:
+        logger.error("Failed to get collection %s: %s", slug, e)
         raise HFCollectionError(f"Failed to get collection: {e}") from e
 
 
@@ -96,6 +101,7 @@ def create_collection(
             url=f"https://huggingface.co/collections/{c.slug}",
         )
     except Exception as e:
+        logger.error("Failed to create collection '%s': %s", title, e)
         raise HFCollectionError(f"Failed to create collection: {e}") from e
 
 
@@ -105,6 +111,7 @@ def delete_collection(slug: str) -> None:
     try:
         with_retry(api.delete_collection, slug)
     except Exception as e:
+        logger.error("Failed to delete collection %s: %s", slug, e)
         raise HFCollectionError(f"Failed to delete collection: {e}") from e
 
 
@@ -127,6 +134,7 @@ def add_collection_item(
         c = with_retry(api.add_collection_item, **kwargs)
         return _to_collection_info(c)
     except Exception as e:
+        logger.error("Failed to add item %s to collection %s: %s", item_id, slug, e)
         raise HFCollectionError(f"Failed to add item: {e}") from e
 
 
@@ -137,6 +145,7 @@ def remove_collection_item(slug: str, item_id: str) -> CollectionInfo:
         c = with_retry(api.delete_collection_item, collection_slug=slug, item_id=item_id)
         return _to_collection_info(c)
     except Exception as e:
+        logger.error("Failed to remove item %s from collection %s: %s", item_id, slug, e)
         raise HFCollectionError(f"Failed to remove item: {e}") from e
 
 
@@ -158,4 +167,5 @@ def update_collection_metadata(
             kwargs["private"] = private
         with_retry(api.update_collection_metadata, **kwargs)
     except Exception as e:
+        logger.error("Failed to update collection %s: %s", slug, e)
         raise HFCollectionError(f"Failed to update collection: {e}") from e

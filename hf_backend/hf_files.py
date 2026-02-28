@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -6,6 +7,8 @@ from huggingface_hub import HfApi
 
 from hf_backend.hf_auth import get_api
 from hf_backend.retry import with_retry
+
+logger = logging.getLogger(__name__)
 
 
 class HFFileError(RuntimeError):
@@ -34,6 +37,7 @@ def upload_file(
         )
         return str(result)
     except Exception as e:
+        logger.error("Failed to upload file %s to %s: %s", local_path, repo_id, e)
         raise HFFileError(f"Failed to upload file: {e}") from e
 
 
@@ -69,6 +73,7 @@ def upload_folder(
         )
         return str(result)
     except Exception as e:
+        logger.error("Failed to upload folder %s to %s: %s", folder_path, repo_id, e)
         raise HFFileError(f"Failed to upload folder: {e}") from e
 
 
@@ -92,6 +97,7 @@ def download_file(
         )
         return str(path)
     except Exception as e:
+        logger.error("Failed to download %s from %s: %s", filename, repo_id, e)
         raise HFFileError(f"Failed to download file: {e}") from e
 
 
@@ -114,6 +120,7 @@ def delete_file(
             revision=revision,
         )
     except Exception as e:
+        logger.error("Failed to delete %s from %s: %s", path_in_repo, repo_id, e)
         raise HFFileError(f"Failed to delete file: {e}") from e
 
 
@@ -138,6 +145,7 @@ def delete_files(
             revision=revision,
         )
     except Exception as e:
+        logger.error("Failed to delete files from %s: %s", repo_id, e)
         raise HFFileError(f"Failed to delete files: {e}") from e
 
 
@@ -165,6 +173,7 @@ def get_file_content(
             try:
                 return raw.decode("utf-8")
             except UnicodeDecodeError:
+                logger.warning("Non-UTF-8 file rejected: %s in %s", path_in_repo, repo_id)
                 raise HFFileError(
                     f"'{path_in_repo}' is not valid UTF-8 text and cannot be "
                     f"opened in the editor. It may be a binary file."
@@ -172,6 +181,7 @@ def get_file_content(
     except HFFileError:
         raise
     except Exception as e:
+        logger.error("Failed to get file content %s from %s: %s", path_in_repo, repo_id, e)
         raise HFFileError(f"Failed to get file content: {e}") from e
 
 
@@ -199,4 +209,5 @@ def upload_file_content(
         )
         return str(result)
     except Exception as e:
+        logger.error("Failed to upload content to %s/%s: %s", repo_id, path_in_repo, e)
         raise HFFileError(f"Failed to upload content: {e}") from e

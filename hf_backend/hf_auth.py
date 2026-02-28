@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -6,6 +7,8 @@ from huggingface_hub import HfApi
 from huggingface_hub.utils import get_token as _hf_get_token
 
 from hf_backend.retry import with_retry
+
+logger = logging.getLogger(__name__)
 
 
 class HFAuthError(RuntimeError):
@@ -42,9 +45,11 @@ def login(token: str) -> UserInfo:
     try:
         info = with_retry(api.whoami)
     except Exception as e:
+        logger.error("Login failed: %s", e)
         _reset_api()
         raise HFAuthError(f"Login failed: {e}") from e
 
+    logger.info("Login successful: %s", info.get("name", ""))
     orgs = [o.get("name", "") for o in info.get("orgs", [])]
     return UserInfo(
         username=info.get("name", ""),
@@ -77,7 +82,8 @@ def whoami(token: str | None = None) -> UserInfo | None:
             avatar_url=info.get("avatarUrl", ""),
             orgs=orgs,
         )
-    except Exception:
+    except Exception as e:
+        logger.debug("whoami check failed: %s", e)
         return None
 
 

@@ -1,8 +1,11 @@
 from __future__ import annotations
+import logging
 from typing import Optional
 
 from hf_backend.hf_auth import get_api
 from hf_backend.hf_files import get_file_content, upload_file_content, HFFileError
+
+logger = logging.getLogger(__name__)
 
 
 class HFModelCardError(RuntimeError):
@@ -248,7 +251,8 @@ def get_readme(repo_id: str, repo_type: str = "model") -> str:
     """Fetch the current README.md from a repo."""
     try:
         return get_file_content(repo_id, "README.md", repo_type=repo_type)
-    except HFFileError:
+    except HFFileError as e:
+        logger.debug("No README found for %s: %s", repo_id, e)
         return ""
 
 
@@ -268,4 +272,5 @@ def push_readme(
             commit_message=commit_message,
         )
     except HFFileError as e:
+        logger.error("Failed to push README to %s: %s", repo_id, e)
         raise HFModelCardError(f"Failed to push README: {e}") from e

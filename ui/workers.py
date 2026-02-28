@@ -1,5 +1,8 @@
 from __future__ import annotations
+import logging
 from PySide6.QtCore import QThread, Signal
+
+logger = logging.getLogger(__name__)
 
 
 class ApiWorker(QThread):
@@ -20,6 +23,7 @@ class ApiWorker(QThread):
             if not self._cancelled:
                 self.finished.emit(result)
         except Exception as e:
+            logger.error("Worker %s failed: %s", self._fn.__name__, e, exc_info=True)
             if not self._cancelled:
                 self.error.emit(str(e))
 

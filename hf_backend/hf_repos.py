@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -7,6 +8,8 @@ from huggingface_hub.utils import RepositoryNotFoundError
 
 from hf_backend.hf_auth import get_api
 from hf_backend.retry import with_retry
+
+logger = logging.getLogger(__name__)
 
 
 class HFRepoError(RuntimeError):
@@ -55,6 +58,7 @@ def list_my_repos(
     except HFRepoError:
         raise
     except Exception as e:
+        logger.error("Failed to list repos: %s", e)
         raise HFRepoError(f"Failed to list repos: {e}") from e
 
     results = []
@@ -97,6 +101,7 @@ def create_repo(
         )
         return str(result)
     except Exception as e:
+        logger.error("Failed to create repo %s: %s", repo_id, e)
         raise HFRepoError(f"Failed to create repo: {e}") from e
 
 
@@ -106,6 +111,7 @@ def delete_repo(repo_id: str, repo_type: str = "model") -> None:
     try:
         with_retry(api.delete_repo, repo_id=repo_id, repo_type=repo_type)
     except Exception as e:
+        logger.error("Failed to delete repo %s: %s", repo_id, e)
         raise HFRepoError(f"Failed to delete repo: {e}") from e
 
 
@@ -115,6 +121,7 @@ def update_repo_visibility(repo_id: str, repo_type: str, private: bool) -> None:
     try:
         with_retry(api.update_repo_settings, repo_id=repo_id, repo_type=repo_type, private=private)
     except Exception as e:
+        logger.error("Failed to update visibility for %s: %s", repo_id, e)
         raise HFRepoError(f"Failed to update visibility: {e}") from e
 
 
@@ -133,8 +140,10 @@ def get_repo_info(repo_id: str, repo_type: str = "model") -> RepoInfo:
     except HFRepoError:
         raise
     except RepositoryNotFoundError:
+        logger.error("Repository not found: %s", repo_id)
         raise HFRepoError(f"Repository not found: {repo_id}")
     except Exception as e:
+        logger.error("Failed to get repo info for %s: %s", repo_id, e)
         raise HFRepoError(f"Failed to get repo info: {e}") from e
 
     modified = ""
@@ -169,6 +178,7 @@ def list_repo_files(repo_id: str, repo_type: str = "model", revision: str = "mai
     except HFRepoError:
         raise
     except Exception as e:
+        logger.error("Failed to list files for %s: %s", repo_id, e)
         raise HFRepoError(f"Failed to list files: {e}") from e
 
     entries = []
@@ -192,4 +202,5 @@ def list_repo_refs(repo_id: str, repo_type: str = "model") -> dict:
         tags = [t.name for t in (refs.tags or [])]
         return {"branches": branches, "tags": tags}
     except Exception as e:
+        logger.error("Failed to list refs for %s: %s", repo_id, e)
         raise HFRepoError(f"Failed to list refs: {e}") from e

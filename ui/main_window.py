@@ -662,24 +662,33 @@ class MainWindow(QMainWindow):
         if not self._current_repo_id:
             return
 
-        branch = self._browser.get_current_branch() or "main"
+        selected_branch = self._browser.get_current_branch()
         repo_id = self._current_repo_id
         repo_type = self._current_repo_type
 
         def fetch():
             try:
                 refs = list_repo_refs(repo_id, repo_type)
-                branches = refs.get("branches", ["main"])
+                branches = refs.get("branches", [])
             except HFRepoError:
+                branches = []
+
+            if selected_branch and selected_branch in branches:
+                effective = selected_branch
+            elif branches:
+                effective = branches[0]
+            else:
+                effective = "main"
                 branches = ["main"]
-            files = list_repo_files(repo_id, repo_type, revision=branch)
-            return branches, files
+
+            files = list_repo_files(repo_id, repo_type, revision=effective)
+            return branches, effective, files
 
         def on_success(result):
             if self._current_repo_id != repo_id:
                 return
-            branches, files = result
-            self._browser.set_branches(branches, branch)
+            branches, effective, files = result
+            self._browser.set_branches(branches, effective)
             self._browser.set_files(files)
             self._status.showMessage(f"Loaded {len(files)} files.", 3000)
 
@@ -756,7 +765,7 @@ class MainWindow(QMainWindow):
         if not self._current_repo_id:
             return
 
-        branch = self._browser.get_current_branch() or "main"
+        branch = self._browser.get_current_branch()
         repo_id = self._current_repo_id
         repo_type = self._current_repo_type
 
@@ -821,7 +830,7 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        branch = self._browser.get_current_branch() or "main"
+        branch = self._browser.get_current_branch()
         repo_id = self._current_repo_id
         repo_type = self._current_repo_type
         count = len(filenames)
@@ -858,7 +867,7 @@ class MainWindow(QMainWindow):
         if not dest_dir:
             return
 
-        branch = self._browser.get_current_branch() or "main"
+        branch = self._browser.get_current_branch()
         repo_id = self._current_repo_id
         repo_type = self._current_repo_type
 

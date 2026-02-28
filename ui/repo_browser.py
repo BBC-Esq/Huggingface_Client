@@ -99,7 +99,7 @@ class RepoBrowser(QWidget):
         if text:
             self.branch_changed.emit(text)
 
-    def set_branches(self, branches: list[str], current: str = "main") -> None:
+    def set_branches(self, branches: list[str], current: str = "") -> None:
         self._branch_combo.blockSignals(True)
         self._branch_combo.clear()
         for b in branches:
@@ -110,7 +110,7 @@ class RepoBrowser(QWidget):
         self._branch_combo.blockSignals(False)
 
     def get_current_branch(self) -> str:
-        return self._branch_combo.currentText() or "main"
+        return self._branch_combo.currentText()
 
     def set_files(self, entries: list[RepoFileEntry]) -> None:
         """Populate the tree from a flat list of file entries."""

@@ -17,6 +17,9 @@ from PySide6.QtWidgets import (
 
 from hf_backend.hf_repos import RepoFileEntry
 
+_SIZE_ROLE = Qt.UserRole + 1
+_MAX_EDIT_BYTES = 10 * 1024 * 1024
+
 
 def _human_size(size: int) -> str:
     if size < 1024:
@@ -131,6 +134,7 @@ class RepoBrowser(QWidget):
                     entry.blob_id[:12] if entry.blob_id else "",
                 ])
                 item.setData(0, Qt.UserRole, entry.rfilename)
+                item.setData(0, _SIZE_ROLE, entry.size)
                 self._tree.addTopLevelItem(item)
             else:
                 folder_path = "/".join(parts[:-1])
@@ -142,6 +146,7 @@ class RepoBrowser(QWidget):
                     entry.blob_id[:12] if entry.blob_id else "",
                 ])
                 item.setData(0, Qt.UserRole, entry.rfilename)
+                item.setData(0, _SIZE_ROLE, entry.size)
                 parent.addChild(item)
 
         self._info_label.setText(f"{len(entries)} files · {_human_size(total_size)} total")
@@ -183,6 +188,25 @@ class RepoBrowser(QWidget):
                 names.append(rfilename)
         return names
 
+    def _try_edit(self, item: QTreeWidgetItem) -> None:
+        rfilename = item.data(0, Qt.UserRole)
+        if not rfilename or not self._looks_like_text(rfilename):
+            return
+        size = item.data(0, _SIZE_ROLE) or 0
+        if size > _MAX_EDIT_BYTES:
+            QMessageBox.information(
+                self,
+                "File Too Large",
+                f"{rfilename} is {_human_size(size)}, which exceeds the "
+                f"10 MB limit for the built-in editor.\n\n"
+                f"To edit this file you can:\n"
+                f"  1. Download it (right-click \u2192 Download file)\n"
+                f"  2. Edit it locally with your preferred text editor\n"
+                f"  3. Upload the modified file using the Upload button",
+            )
+            return
+        self.request_edit_file.emit(rfilename)
+
     def _on_context_menu(self, pos) -> None:
         if not self._actions_enabled:
             return
@@ -193,12 +217,14 @@ class RepoBrowser(QWidget):
         menu = QMenu(self)
 
         if len(selected) == 1:
+            item = self._tree.selectedItems()[0]
             name = selected[0]
             is_text = self._looks_like_text(name)
+            size = item.data(0, _SIZE_ROLE) or 0
 
-            if is_text:
+            if is_text and size <= _MAX_EDIT_BYTES:
                 act_edit = QAction("Edit file...", self)
-                act_edit.triggered.connect(lambda: self.request_edit_file.emit(name))
+                act_edit.triggered.connect(lambda: self._try_edit(item))
                 menu.addAction(act_edit)
 
             act_download = QAction("Download file...", self)
@@ -214,9 +240,7 @@ class RepoBrowser(QWidget):
     def _on_double_click(self, item: QTreeWidgetItem, column: int) -> None:
         if not self._actions_enabled:
             return
-        rfilename = item.data(0, Qt.UserRole)
-        if rfilename and self._looks_like_text(rfilename):
-            self.request_edit_file.emit(rfilename)
+        self._try_edit(item)
 
     @staticmethod
     def _looks_like_text(name: str) -> bool:

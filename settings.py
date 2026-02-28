@@ -50,3 +50,18 @@ class AppSettings:
 
     def set_splitter_state(self, state: QByteArray) -> None:
         self._qs.setValue("splitter_state", state)
+
+    def get_favorite_repos(self) -> set[str]:
+        raw = self._qs.value("favorite_repos", [])
+        if isinstance(raw, list):
+            return set(raw)
+        return set()
+
+    def set_favorite_repos(self, repos: set[str]) -> None:
+        self._qs.setValue("favorite_repos", sorted(repos))
+
+    def get_favorites_only(self) -> bool:
+        return self._qs.value("favorites_only", False, bool)
+
+    def set_favorites_only(self, val: bool) -> None:
+        self._qs.setValue("favorites_only", val)

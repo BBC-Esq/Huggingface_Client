@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
     QDialog,
     QStatusBar,
     QProgressBar,
+    QCheckBox,
+    QMenu,
 )
 
 from settings import AppSettings
@@ -90,6 +92,8 @@ class MainWindow(QMainWindow):
         self._workers: set = set()
         self._readme_cache: dict[tuple, str] = {}
         self._busy: bool = False
+        self._all_repos: list[RepoInfo] = []
+        self._favorites: set[str] = set()
 
         self._build_ui()
         self._connect_signals()
@@ -153,6 +157,7 @@ class MainWindow(QMainWindow):
         self._btn_toggle_vis.setEnabled(enabled)
         self._repo_type_combo.setEnabled(enabled)
         self._search_input.setEnabled(enabled)
+        self._chk_favorites.setEnabled(enabled)
         self._btn_load_readme.setEnabled(enabled)
         self._btn_edit_readme.setEnabled(enabled)
         self._btn_new_model_card.setEnabled(enabled)
@@ -211,23 +216,28 @@ class MainWindow(QMainWindow):
         self._btn_create_repo.setMaximumWidth(36)
         repo_toolbar.addWidget(self._btn_create_repo)
 
+        self._chk_favorites = QCheckBox("\u2605 Favorites only")
+        repo_toolbar.addWidget(self._chk_favorites)
+
         left_layout.addLayout(repo_toolbar)
 
         self._repo_tree = QTreeWidget()
-        self._repo_tree.setHeaderLabels(["Repository", "Visibility", "Downloads", "Likes", "Modified"])
+        self._repo_tree.setHeaderLabels(["\u2605", "Repository", "Visibility", "Downloads", "Likes", "Modified"])
         self._repo_tree.setRootIsDecorated(False)
         self._repo_tree.setSortingEnabled(True)
         self._repo_tree.setSelectionMode(QTreeWidget.SingleSelection)
+        self._repo_tree.setContextMenuPolicy(Qt.CustomContextMenu)
 
         header = self._repo_tree.header()
         header.setStretchLastSection(False)
-        for i in range(5):
+        for i in range(6):
             header.setSectionResizeMode(i, QHeaderView.Interactive)
-        header.resizeSection(0, 300)
-        header.resizeSection(1, 80)
-        header.resizeSection(2, 90)
-        header.resizeSection(3, 70)
-        header.resizeSection(4, 150)
+        header.resizeSection(0, 30)
+        header.resizeSection(1, 300)
+        header.resizeSection(2, 80)
+        header.resizeSection(3, 90)
+        header.resizeSection(4, 70)
+        header.resizeSection(5, 150)
 
         left_layout.addWidget(self._repo_tree, 1)
 
@@ -302,9 +312,11 @@ class MainWindow(QMainWindow):
 
         self._btn_refresh_repos.clicked.connect(self._refresh_repos)
         self._btn_create_repo.clicked.connect(self._on_create_repo)
+        self._chk_favorites.toggled.connect(self._on_favorites_toggled)
         self._repo_type_combo.currentIndexChanged.connect(self._refresh_repos)
         self._search_input.returnPressed.connect(self._refresh_repos)
         self._repo_tree.currentItemChanged.connect(self._on_repo_selected)
+        self._repo_tree.customContextMenuRequested.connect(self._on_repo_context_menu)
         self._btn_delete_repo.clicked.connect(self._on_delete_repo)
         self._btn_toggle_vis.clicked.connect(self._on_toggle_visibility)
         self._btn_open_hub.clicked.connect(self._on_open_hub)
@@ -350,6 +362,9 @@ class MainWindow(QMainWindow):
             idx = self._repo_type_combo.findData(saved_type)
             if idx >= 0:
                 self._repo_type_combo.setCurrentIndex(idx)
+
+        self._favorites = self._settings.get_favorite_repos()
+        self._chk_favorites.setChecked(self._settings.get_favorites_only())
 
     def closeEvent(self, event) -> None:
         for worker in list(self._workers):
@@ -412,6 +427,7 @@ class MainWindow(QMainWindow):
         self._user = None
         self._settings.set_hf_token("")
         self._readme_cache.clear()
+        self._all_repos.clear()
         self._user_label.setText("Not logged in")
         self._btn_login.setEnabled(True)
         self._btn_logout.setEnabled(False)
@@ -434,26 +450,72 @@ class MainWindow(QMainWindow):
         search = self._search_input.text().strip() or None
 
         def on_success(repos):
-            self._repo_tree.clear()
-            for r in repos:
-                item = QTreeWidgetItem([
-                    r.repo_id,
-                    "Private" if r.private else "Public",
-                    str(r.downloads),
-                    str(r.likes),
-                    r.last_modified[:19] if r.last_modified else "",
-                ])
-                item.setData(0, Qt.UserRole, r)
-                self._repo_tree.addTopLevelItem(item)
-            self._status.showMessage(f"Found {len(repos)} {repo_type}(s).", 3000)
+            self._all_repos = list(repos)
+            self._populate_repo_tree()
 
         self._run_api(
             list_my_repos,
             kwargs={"repo_type": repo_type, "author": self._user.username, "search": search},
             on_success=on_success,
-            status_msg=f"Loading {repo_type}s...",
+            status_msg=f"Loading {self._repo_type_combo.currentText().lower()}...",
             busy=False,
         )
+
+    def _populate_repo_tree(self) -> None:
+        self._repo_tree.clear()
+        favs_only = self._chk_favorites.isChecked()
+        shown = 0
+        for r in self._all_repos:
+            is_fav = r.repo_id in self._favorites
+            if favs_only and not is_fav:
+                continue
+            item = QTreeWidgetItem([
+                "\u2605" if is_fav else "",
+                r.repo_id,
+                "Private" if r.private else "Public",
+                str(r.downloads),
+                str(r.likes),
+                r.last_modified[:19] if r.last_modified else "",
+            ])
+            item.setData(0, Qt.UserRole, r)
+            self._repo_tree.addTopLevelItem(item)
+            shown += 1
+        total = len(self._all_repos)
+        if favs_only:
+            self._status.showMessage(f"Showing {shown} favorite(s) of {total} repos.", 3000)
+        else:
+            self._status.showMessage(f"Found {total} repo(s).", 3000)
+
+    def _on_favorites_toggled(self, checked: bool) -> None:
+        self._settings.set_favorites_only(checked)
+        self._populate_repo_tree()
+
+    def _on_repo_context_menu(self, pos) -> None:
+        item = self._repo_tree.itemAt(pos)
+        if not item:
+            return
+        info: RepoInfo = item.data(0, Qt.UserRole)
+        if not info:
+            return
+
+        menu = QMenu(self)
+        is_fav = info.repo_id in self._favorites
+        if is_fav:
+            action = menu.addAction("Remove from Favorites")
+        else:
+            action = menu.addAction("Add to Favorites")
+
+        chosen = menu.exec(self._repo_tree.viewport().mapToGlobal(pos))
+        if chosen == action:
+            self._toggle_favorite(info.repo_id)
+
+    def _toggle_favorite(self, repo_id: str) -> None:
+        if repo_id in self._favorites:
+            self._favorites.discard(repo_id)
+        else:
+            self._favorites.add(repo_id)
+        self._settings.set_favorite_repos(self._favorites)
+        self._populate_repo_tree()
 
     def _on_repo_selected(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
         if current is None or self._busy:

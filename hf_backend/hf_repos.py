@@ -39,7 +39,7 @@ def list_my_repos(
     author: str | None = None,
     search: str | None = None,
     sort: str = "lastModified",
-    limit: int = 100,
+    limit: int | None = None,
 ) -> List[RepoInfo]:
     """List repos owned by the current user (or a specified author)."""
     api = get_api()

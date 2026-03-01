@@ -4,6 +4,8 @@ A PySide6 desktop application for managing your Hugging Face Hub account — rep
 
 ---
 
+<img width="1405" height="758" alt="image" src="https://github.com/user-attachments/assets/0552ba3f-77be-44cb-87f7-a505adffb412" />
+
 ## ✨ Features
 
 | | Feature | Description |
